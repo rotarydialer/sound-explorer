@@ -24,6 +24,7 @@ Generates 10 sounds (2–3 of each synthesis type) into a timestamped batch dire
 --count N          Number of sounds to generate (default: 10)
 --types LIST       Comma-separated synthesis types (default: all)
 --duration SECS    Fix duration for all sounds (default: random per sound)
+--formats LIST     Comma-separated output formats: ogg,wav (default: ogg)
 ```
 
 **Examples:**
@@ -37,6 +38,9 @@ ruby generate.rb --types fm,subtractive
 
 # Short sounds for quick testing
 ruby generate.rb --count 4 --duration 1.5
+
+# Keep both WAV and OGG
+ruby generate.rb --formats wav,ogg
 ```
 
 ### Synthesis types
@@ -55,14 +59,14 @@ Each run creates a timestamped batch directory:
 ```
 output/
   2026-04-08_143022/
-    fm_001.wav           # Full-quality audio (44100 Hz, 16-bit)
-    fm_001.ogg           # Compressed for web playback
+    fm_001.ogg           # Audio (OGG Vorbis)
     fm_001.json          # Metadata (see below)
-    subtractive_001.wav
     subtractive_001.ogg
     subtractive_001.json
     ...
 ```
+
+With `--formats wav,ogg`, both formats are kept. With `--formats wav`, only WAV is produced (no ffmpeg conversion).
 
 ### Metadata format
 
