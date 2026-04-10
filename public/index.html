@@ -12,6 +12,28 @@
   </header>
   <div id="layout">
     <nav id="sidebar">
+      <div id="generate-panel">
+        <h2>Generate</h2>
+        <div class="gen-field">
+          <label for="gen-count">Count</label>
+          <input type="number" id="gen-count" value="10" min="1" max="100">
+        </div>
+        <div class="gen-field">
+          <label for="gen-types">Types</label>
+          <select id="gen-types" multiple>
+            <option value="fm" selected>FM</option>
+            <option value="subtractive" selected>Subtractive</option>
+            <option value="additive" selected>Additive</option>
+            <option value="granular" selected>Granular</option>
+          </select>
+        </div>
+        <div class="gen-field">
+          <label for="gen-duration">Duration (s)</label>
+          <input type="number" id="gen-duration" placeholder="random" min="0.5" max="30" step="0.5">
+        </div>
+        <button id="gen-btn" onclick="triggerGenerate()">Generate</button>
+        <div id="gen-status"></div>
+      </div>
       <h2>Batches</h2>
       <ul id="batch-list"></ul>
     </nav>

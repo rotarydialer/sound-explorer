@@ -166,4 +166,55 @@ function esc(str) {
   return div.innerHTML;
 }
 
+async function triggerGenerate() {
+  const btn = document.getElementById("gen-btn");
+  const status = document.getElementById("gen-status");
+  const count = document.getElementById("gen-count").value;
+  const typesSelect = document.getElementById("gen-types");
+  const durationInput = document.getElementById("gen-duration").value;
+
+  const types = Array.from(typesSelect.selectedOptions).map((o) => o.value).join(",");
+
+  const body = { count: parseInt(count), types };
+  if (durationInput) body.duration = parseFloat(durationInput);
+
+  btn.disabled = true;
+  btn.textContent = "Generating...";
+  status.textContent = "";
+
+  try {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      status.textContent = `Server error: ${text.slice(0, 200)}`;
+      return;
+    }
+
+    if (!res.ok) {
+      status.textContent = `Error: ${data.error}`;
+      return;
+    }
+
+    // Refresh batch list and select the new batch
+    const list = document.getElementById("batch-list");
+    list.innerHTML = "";
+    await loadBatches();
+
+    status.textContent = `Created ${data.batch}`;
+  } catch (e) {
+    status.textContent = `Error: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generate";
+  }
+}
+
 loadBatches();

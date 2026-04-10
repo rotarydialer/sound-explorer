@@ -1,11 +1,13 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const { execFile } = require("child_process");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const OUTPUT_DIR = path.join(__dirname, "output");
 
+app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 // List all batches, newest first
@@ -54,6 +56,31 @@ app.get("/audio/:batch/:filename", (req, res) => {
   if (!fs.existsSync(filePath)) return res.status(404).send("not found");
 
   res.sendFile(filePath);
+});
+
+// Trigger sound generation
+app.post("/api/generate", (req, res) => {
+  const body = req.body || {};
+  const { count, types, duration, formats } = body;
+  const args = [path.join(__dirname, "generate.rb")];
+
+  if (count) args.push("--count", String(count));
+  if (types) args.push("--types", types);
+  if (duration) args.push("--duration", String(duration));
+  if (formats) args.push("--formats", formats);
+
+  console.log("Running: ruby", args.join(" "));
+
+  execFile("ruby", args, { timeout: 120000 }, (err, stdout, stderr) => {
+    if (err) {
+      console.error("Generate failed:", err.message);
+      return res.status(500).json({ error: err.message, output: (stdout || "") + (stderr || "") });
+    }
+    // Extract batch name from output (last line like "Batch complete: .../2026-04-08_235447")
+    const match = stdout.match(/Batch complete: .*\/(\S+)/);
+    const batch = match ? match[1] : null;
+    res.json({ batch, output: stdout });
+  });
 });
 
 app.listen(PORT, () => {
