@@ -61,13 +61,14 @@ app.get("/audio/:batch/:filename", (req, res) => {
 // Trigger sound generation
 app.post("/api/generate", (req, res) => {
   const body = req.body || {};
-  const { count, types, duration, formats } = body;
+  const { count, types, duration, formats, freq } = body;
   const args = [path.join(__dirname, "generate.rb")];
 
   if (count) args.push("--count", String(count));
   if (types) args.push("--types", types);
   if (duration) args.push("--duration", String(duration));
   if (formats) args.push("--formats", formats);
+  if (freq) args.push("--freq", String(freq));
 
   console.log("Running: ruby", args.join(" "));
 

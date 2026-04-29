@@ -9,19 +9,38 @@ require_relative "lib/synth_fm"
 require_relative "lib/synth_subtractive"
 require_relative "lib/synth_additive"
 require_relative "lib/synth_granular"
+require_relative "lib/synth_karplus"
+require_relative "lib/synth_modal"
+require_relative "lib/synth_drum"
+require_relative "lib/synth_physical"
+require_relative "lib/synth_formant"
+require_relative "lib/synth_noise"
+require_relative "lib/synth_stochastic"
+require_relative "lib/synth_waveshape"
+require_relative "lib/synth_ringmod"
 
 SYNTH_TYPES = {
   "fm"          => SynthFm,
   "subtractive" => SynthSubtractive,
   "additive"    => SynthAdditive,
-  "granular"    => SynthGranular
+  "granular"    => SynthGranular,
+  "karplus"     => SynthKarplus,
+  "modal"       => SynthModal,
+  "drum"        => SynthDrum,
+  "physical"    => SynthPhysical,
+  "formant"     => SynthFormant,
+  "noise"       => SynthNoise,
+  "stochastic"  => SynthStochastic,
+  "waveshape"   => SynthWaveshape,
+  "ringmod"     => SynthRingmod
 }.freeze
 
 options = {
   count: 10,
   types: SYNTH_TYPES.keys,
   duration: nil,  # nil means each synth picks its own random duration
-  formats: ["ogg"]
+  formats: ["ogg"],
+  freq: nil       # nil means each synth picks its own random frequency
 }
 
 OptionParser.new do |opts|
@@ -41,6 +60,10 @@ OptionParser.new do |opts|
 
   opts.on("--formats FORMATS", "Comma-separated output formats: ogg,wav (default: ogg)") do |f|
     options[:formats] = f.split(",").map(&:strip)
+  end
+
+  opts.on("--freq HZ", Float, "Fixed base frequency in Hz (default: random per sound)") do |f|
+    options[:freq] = f
   end
 end.parse!
 
@@ -69,7 +92,7 @@ options[:count].times do |i|
 
   print "  [#{i + 1}/#{options[:count]}] #{name}..."
 
-  result = synth.generate(duration: options[:duration])
+  result = synth.generate(duration: options[:duration], freq: options[:freq])
 
   paths = CsdRunner.render(result[:csd], output_dir, name, formats: options[:formats])
 

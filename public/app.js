@@ -110,6 +110,52 @@ function formatParams(sound) {
       parts.push(`<span><span class="param-label">grain dur</span> ${p.grain_duration}s</span>`);
       parts.push(`<span><span class="param-label">scatter</span> ${p.pitch_scatter_semitones} st</span>`);
       break;
+    case "karplus":
+      parts.push(`<span><span class="param-label">freq</span> ${p.base_freq} Hz</span>`);
+      parts.push(`<span><span class="param-label">method</span> ${p.method}</span>`);
+      parts.push(`<span><span class="param-label">voices</span> ${p.voices}</span>`);
+      break;
+    case "modal":
+      parts.push(`<span><span class="param-label">freq</span> ${p.base_freq} Hz</span>`);
+      parts.push(`<span><span class="param-label">preset</span> ${p.preset}</span>`);
+      parts.push(`<span><span class="param-label">modes</span> ${p.modes.length}</span>`);
+      break;
+    case "drum":
+      parts.push(`<span><span class="param-label">type</span> ${p.archetype}</span>`);
+      parts.push(`<span><span class="param-label">body</span> ${p.body_freq} Hz</span>`);
+      parts.push(`<span><span class="param-label">sweep</span> x${p.pitch_sweep_mult}</span>`);
+      break;
+    case "physical":
+      parts.push(`<span><span class="param-label">model</span> ${p.instrument}</span>`);
+      parts.push(`<span><span class="param-label">freq</span> ${p.base_freq} Hz</span>`);
+      parts.push(`<span><span class="param-label">glide</span> ${p.glide_cents}¢</span>`);
+      break;
+    case "formant":
+      parts.push(`<span><span class="param-label">vowel</span> ${p.vowel}</span>`);
+      parts.push(`<span><span class="param-label">fund</span> ${p.fundamental} Hz</span>`);
+      parts.push(`<span><span class="param-label">vibrato</span> ${p.vibrato.rate} Hz</span>`);
+      break;
+    case "noise":
+      parts.push(`<span><span class="param-label">color</span> ${p.color}</span>`);
+      parts.push(`<span><span class="param-label">filter</span> ${p.filter}</span>`);
+      parts.push(`<span><span class="param-label">cutoff</span> ${p.cutoff_start}→${p.cutoff_end} Hz</span>`);
+      parts.push(`<span><span class="param-label">bw</span> ${p.bandwidth} Hz</span>`);
+      break;
+    case "stochastic":
+      parts.push(`<span><span class="param-label">center</span> ${p.center_freq} Hz</span>`);
+      parts.push(`<span><span class="param-label">voices</span> ${p.voice_count}</span>`);
+      parts.push(`<span><span class="param-label">flicker</span> ${p.flicker.rate} Hz</span>`);
+      break;
+    case "waveshape":
+      parts.push(`<span><span class="param-label">source</span> ${p.source}</span>`);
+      parts.push(`<span><span class="param-label">freq</span> ${p.base_freq} Hz</span>`);
+      parts.push(`<span><span class="param-label">drive</span> ${p.drive.start}→${p.drive.end}</span>`);
+      break;
+    case "ringmod":
+      parts.push(`<span><span class="param-label">carrier</span> ${p.carrier_freq} Hz (${p.carrier_wave})</span>`);
+      parts.push(`<span><span class="param-label">mod ratio</span> ${p.mod_ratio}</span>`);
+      parts.push(`<span><span class="param-label">ring mix</span> ${p.ring_amount}</span>`);
+      break;
   }
 
   return parts.join("");
@@ -171,11 +217,13 @@ async function triggerGenerate() {
   const status = document.getElementById("gen-status");
   const count = document.getElementById("gen-count").value;
   const typesSelect = document.getElementById("gen-types");
+  const freqInput = document.getElementById("gen-freq").value;
   const durationInput = document.getElementById("gen-duration").value;
 
   const types = Array.from(typesSelect.selectedOptions).map((o) => o.value).join(",");
 
   const body = { count: parseInt(count), types };
+  if (freqInput) body.freq = parseFloat(freqInput);
   if (durationInput) body.duration = parseFloat(durationInput);
 
   btn.disabled = true;
