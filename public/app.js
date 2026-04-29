@@ -156,6 +156,35 @@ function formatParams(sound) {
       parts.push(`<span><span class="param-label">mod ratio</span> ${p.mod_ratio}</span>`);
       parts.push(`<span><span class="param-label">ring mix</span> ${p.ring_amount}</span>`);
       break;
+    case "granular_sample":
+      parts.push(`<span><span class="param-label">sample</span> ${p.sample}</span>`);
+      parts.push(`<span><span class="param-label">grain size</span> ${p.grain_size}s</span>`);
+      parts.push(`<span><span class="param-label">density</span> ${p.grain_density}/s</span>`);
+      parts.push(`<span><span class="param-label">pitch</span> ${p.pitch_semitones} st</span>`);
+      parts.push(`<span><span class="param-label">read rate</span> ${p.pointer_rate}×</span>`);
+      break;
+    case "timestretch":
+      parts.push(`<span><span class="param-label">sample</span> ${p.sample}</span>`);
+      parts.push(`<span><span class="param-label">stretch</span> ${p.stretch}×</span>`);
+      parts.push(`<span><span class="param-label">pitch</span> ${p.pitch_semitones} st</span>`);
+      parts.push(`<span><span class="param-label">window</span> ${p.start_position}→${p.end_position}s</span>`);
+      break;
+    case "spectral_morph":
+      parts.push(`<span><span class="param-label">A</span> ${p.sample_a}</span>`);
+      parts.push(`<span><span class="param-label">B</span> ${p.sample_b}</span>`);
+      parts.push(`<span><span class="param-label">shape</span> ${p.morph_shape}</span>`);
+      parts.push(`<span><span class="param-label">rate</span> ${p.morph_rate} Hz</span>`);
+      break;
+    case "cross_synth":
+      parts.push(`<span><span class="param-label">excitor</span> ${p.excitor_sample}</span>`);
+      parts.push(`<span><span class="param-label">filter</span> ${p.filter_sample}</span>`);
+      parts.push(`<span><span class="param-label">cross</span> ${p.cross_amount}</span>`);
+      break;
+    case "convolution":
+      parts.push(`<span><span class="param-label">IR</span> ${p.impulse_response}</span>`);
+      parts.push(`<span><span class="param-label">excitation</span> ${p.excitation}</span>`);
+      parts.push(`<span><span class="param-label">wet</span> ${p.wet_dry}</span>`);
+      break;
   }
 
   return parts.join("");

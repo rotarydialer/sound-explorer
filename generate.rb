@@ -5,6 +5,7 @@ require "time"
 
 require_relative "lib/csd_runner"
 require_relative "lib/metadata"
+require_relative "lib/sample_library"
 require_relative "lib/synth_fm"
 require_relative "lib/synth_subtractive"
 require_relative "lib/synth_additive"
@@ -18,29 +19,45 @@ require_relative "lib/synth_noise"
 require_relative "lib/synth_stochastic"
 require_relative "lib/synth_waveshape"
 require_relative "lib/synth_ringmod"
+require_relative "lib/synth_granular_sample"
+require_relative "lib/synth_timestretch"
+require_relative "lib/synth_spectral_morph"
+require_relative "lib/synth_cross_synth"
+require_relative "lib/synth_convolution"
 
 SYNTH_TYPES = {
-  "fm"          => SynthFm,
-  "subtractive" => SynthSubtractive,
-  "additive"    => SynthAdditive,
-  "granular"    => SynthGranular,
-  "karplus"     => SynthKarplus,
-  "modal"       => SynthModal,
-  "drum"        => SynthDrum,
-  "physical"    => SynthPhysical,
-  "formant"     => SynthFormant,
-  "noise"       => SynthNoise,
-  "stochastic"  => SynthStochastic,
-  "waveshape"   => SynthWaveshape,
-  "ringmod"     => SynthRingmod
+  "fm"               => SynthFm,
+  "subtractive"      => SynthSubtractive,
+  "additive"         => SynthAdditive,
+  "granular"         => SynthGranular,
+  "karplus"          => SynthKarplus,
+  "modal"            => SynthModal,
+  "drum"             => SynthDrum,
+  "physical"         => SynthPhysical,
+  "formant"          => SynthFormant,
+  "noise"            => SynthNoise,
+  "stochastic"       => SynthStochastic,
+  "waveshape"        => SynthWaveshape,
+  "ringmod"          => SynthRingmod,
+  "granular_sample"  => SynthGranularSample,
+  "timestretch"      => SynthTimestretch,
+  "spectral_morph"   => SynthSpectralMorph,
+  "cross_synth"      => SynthCrossSynth,
+  "convolution"      => SynthConvolution
 }.freeze
+
+SAMPLE_BASED_TYPES = %w[
+  granular_sample timestretch spectral_morph cross_synth convolution
+].freeze
 
 options = {
   count: 10,
   types: SYNTH_TYPES.keys,
   duration: nil,  # nil means each synth picks its own random duration
   formats: ["ogg"],
-  freq: nil       # nil means each synth picks its own random frequency
+  freq: nil,      # nil means each synth picks its own random frequency
+  samples_dir: nil,
+  samples_info: false
 }
 
 OptionParser.new do |opts|
@@ -65,13 +82,43 @@ OptionParser.new do |opts|
   opts.on("--freq HZ", Float, "Fixed base frequency in Hz (default: random per sound)") do |f|
     options[:freq] = f
   end
+
+  opts.on("--samples-dir PATH", "Directory containing audio samples (default: $SAMPLES_DIR or ./samples)") do |p|
+    options[:samples_dir] = p
+  end
+
+  opts.on("--samples-info", "Print info about the configured sample library and exit") do
+    options[:samples_info] = true
+  end
 end.parse!
+
+SampleLibrary.configure(samples_dir: options[:samples_dir])
+
+if options[:samples_info]
+  info = SampleLibrary.info
+  puts "Samples dir: #{info[:samples_dir]}"
+  puts "Total samples: #{info[:total]}"
+  if info[:categories].empty?
+    puts "(no top-level subdirectories — all samples treated as a flat pool)"
+  else
+    puts "Categories:"
+    info[:categories].each { |cat, n| puts "  #{cat}: #{n}" }
+  end
+  exit 0
+end
 
 # Validate types
 options[:types].each do |t|
   unless SYNTH_TYPES.key?(t)
     abort "Unknown synth type '#{t}'. Available: #{SYNTH_TYPES.keys.join(', ')}"
   end
+end
+
+# Sanity-check sample library availability if any sample-based types are requested
+sample_types_requested = options[:types] & SAMPLE_BASED_TYPES
+if sample_types_requested.any? && SampleLibrary.empty?
+  abort "Sample-based types requested (#{sample_types_requested.join(', ')}) but no samples found in #{SampleLibrary.samples_dir}.\n" \
+        "Set --samples-dir or $SAMPLES_DIR to a directory containing .wav/.aif/.flac files."
 end
 
 # Create batch directory
@@ -111,6 +158,8 @@ options[:count].times do |i|
 rescue => e
   puts " FAILED: #{e.message}"
 end
+
+SampleLibrary.flush_cache
 
 puts "\nBatch complete: #{output_dir}"
 puts "Generated #{counters.map { |k, v| "#{v} #{k}" }.join(', ')}"
