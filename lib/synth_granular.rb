@@ -1,9 +1,9 @@
 module SynthGranular
   module_function
 
-  def generate(duration: nil)
+  def generate(duration: nil, freq: nil)
     duration ||= rand(2.0..6.0).round(2)
-    base_freq = rand(100.0..800.0).round(2)
+    base_freq = freq || rand(100.0..800.0).round(2)
     grain_density = rand(5.0..80.0).round(1)     # grains per second
     grain_dur = rand(0.01..0.15).round(4)          # seconds per grain
     pitch_scatter = rand(0.0..2.0).round(3)        # semitones of random scatter

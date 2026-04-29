@@ -1,9 +1,9 @@
 module SynthFm
   module_function
 
-  def generate(duration: nil)
+  def generate(duration: nil, freq: nil)
     duration ||= rand(1.0..4.0).round(2)
-    carrier_freq = rand(100.0..2000.0).round(2)
+    carrier_freq = freq || rand(100.0..2000.0).round(2)
     mod_ratio = rand(0.5..8.0).round(3)
     mod_index = rand(0.1..20.0).round(2)
     amplitude = rand(0.3..0.8).round(2)

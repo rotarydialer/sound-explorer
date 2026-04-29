@@ -1,9 +1,9 @@
 module SynthAdditive
   module_function
 
-  def generate(duration: nil)
+  def generate(duration: nil, freq: nil)
     duration ||= rand(1.0..4.0).round(2)
-    fundamental = rand(80.0..600.0).round(2)
+    fundamental = freq || rand(80.0..600.0).round(2)
     num_partials = rand(3..16)
     amplitude = rand(0.3..0.7).round(2)
 

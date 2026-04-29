@@ -1,9 +1,9 @@
 module SynthSubtractive
   module_function
 
-  def generate(duration: nil)
+  def generate(duration: nil, freq: nil)
     duration ||= rand(1.0..4.0).round(2)
-    base_freq = rand(60.0..800.0).round(2)
+    base_freq = freq || rand(60.0..800.0).round(2)
     # vco2 waveform type: 0=sawtooth, 10=square, 12=triangle
     waveform = [0, 10, 12].sample
     waveform_name = { 0 => "sawtooth", 10 => "square", 12 => "triangle" }[waveform]
