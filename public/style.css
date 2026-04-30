@@ -259,7 +259,7 @@ header h1 {
 }
 
 #favorites-nav li {
-  padding: 0.5rem 0.6rem;
+  padding: 0.4rem 0.6rem;
   margin-bottom: 2px;
   border-radius: 4px;
   cursor: pointer;
@@ -276,10 +276,27 @@ header h1 {
   color: #ffd166;
 }
 
-#favorites-count {
+#favorites-nav .fav-nav-all {
+  font-weight: 600;
+}
+
+#favorites-nav .fav-nav-group {
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+}
+
+#favorites-nav .fav-nav-type {
+  padding-left: 1.2rem;
+  font-size: 0.8rem;
+}
+
+.favorites-count {
   color: #666;
   margin-left: 0.3rem;
-  font-size: 0.8em;
+  font-size: 0.85em;
 }
 
 #batch-list li {

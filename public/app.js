@@ -2,7 +2,8 @@ let currentAudio = null;
 let currentPlayBtn = null;
 let favoritesSet = new Set();
 let favoriteTitles = new Map(); // key -> title
-let currentView = null; // { kind: "batch", batch } | { kind: "favorites" }
+let favoritesCache = []; // last loaded favorites list (sounds with .batch and .synth_type)
+let currentView = null; // { kind: "batch", batch } | { kind: "favorites", group?, type? }
 
 function favKey(batch, name) {
   return `${batch}::${name}`;
@@ -30,9 +31,26 @@ const TYPE_LABELS = {
   convolution: "Convolution"
 };
 
-const SAMPLE_BASED_TYPES = new Set([
-  "granular_sample", "timestretch", "spectral_morph", "cross_synth", "convolution"
-]);
+const TYPE_GROUPS = {
+  classic: ["fm", "subtractive", "additive", "granular"],
+  percussive: ["karplus", "modal", "drum", "physical"],
+  vocal: ["formant", "noise", "stochastic"],
+  distortion: ["waveshape", "ringmod"],
+  samples: ["granular_sample", "timestretch", "spectral_morph", "cross_synth", "convolution"],
+};
+
+const GROUP_LABELS = {
+  classic: "Classic",
+  percussive: "Percussive & Physical",
+  vocal: "Vocal & Texture",
+  distortion: "Distortion & Spectral",
+  samples: "Sample-based",
+};
+
+const TYPE_TO_GROUP = {};
+for (const [g, ts] of Object.entries(TYPE_GROUPS)) ts.forEach((t) => (TYPE_TO_GROUP[t] = g));
+
+const SAMPLE_BASED_TYPES = new Set(TYPE_GROUPS.samples);
 
 const STORAGE_KEY = "sound-explorer.selected-types";
 const BAR_HIDDEN_KEY = "sound-explorer.gen-bar-hidden";
@@ -123,31 +141,99 @@ function restoreBarState() {
 async function loadFavorites({ render } = { render: false }) {
   const res = await fetch("/api/favorites");
   const sounds = await res.json();
+  favoritesCache = sounds;
   favoritesSet = new Set(sounds.map((s) => favKey(s.batch, s.name)));
   favoriteTitles = new Map(
     sounds.filter((s) => s.favorite_title).map((s) => [favKey(s.batch, s.name), s.favorite_title])
   );
-  document.getElementById("favorites-count").textContent =
-    sounds.length ? `(${sounds.length})` : "";
-  if (render) renderFavorites(sounds);
+  renderFavoritesNav();
+  if (render) renderFavoritesView();
   return sounds;
 }
 
-function renderFavorites(sounds) {
-  const container = document.getElementById("sounds");
+function renderFavoritesNav() {
+  const nav = document.getElementById("favorites-nav");
+  const sounds = favoritesCache;
+
+  // Counts per group / type
+  const groupCounts = {};
+  const typeCounts = {};
+  for (const s of sounds) {
+    const g = TYPE_TO_GROUP[s.synth_type] || "other";
+    groupCounts[g] = (groupCounts[g] || 0) + 1;
+    typeCounts[s.synth_type] = (typeCounts[s.synth_type] || 0) + 1;
+  }
+
+  const isActive = (pred) =>
+    currentView && currentView.kind === "favorites" && pred ? "active" : "";
+
+  const allActive = isActive(!currentView?.group && !currentView?.type);
+
+  let html = `<li class="fav-nav-all ${allActive}" data-action="all">★ All favorites${
+    sounds.length ? ` <span class="favorites-count">(${sounds.length})</span>` : ""
+  }</li>`;
+
+  for (const groupKey of Object.keys(TYPE_GROUPS)) {
+    const gCount = groupCounts[groupKey];
+    if (!gCount) continue;
+    const gActive = isActive(currentView?.group === groupKey && !currentView?.type);
+    html += `<li class="fav-nav-group ${gActive}" data-action="group" data-group="${groupKey}">${esc(
+      GROUP_LABELS[groupKey]
+    )} <span class="favorites-count">(${gCount})</span></li>`;
+
+    for (const t of TYPE_GROUPS[groupKey]) {
+      const tCount = typeCounts[t];
+      if (!tCount) continue;
+      const tActive = isActive(currentView?.type === t);
+      html += `<li class="fav-nav-type ${tActive}" data-action="type" data-type="${t}">${esc(
+        TYPE_LABELS[t] || t
+      )} <span class="favorites-count">(${tCount})</span></li>`;
+    }
+  }
+
+  // Empty state
   if (sounds.length === 0) {
-    container.innerHTML = '<div class="empty-state">No favorites yet. Click ★ on a sound to favorite it.</div>';
+    html = `<li class="fav-nav-all ${allActive}" data-action="all">★ All favorites</li>`;
+  }
+
+  nav.innerHTML = html;
+  nav.querySelectorAll("li").forEach((li) => {
+    li.addEventListener("click", () => {
+      const action = li.dataset.action;
+      if (action === "all") selectFavorites();
+      else if (action === "group") selectFavorites({ group: li.dataset.group });
+      else if (action === "type") selectFavorites({ type: li.dataset.type });
+    });
+  });
+}
+
+function renderFavoritesView() {
+  const container = document.getElementById("sounds");
+  let sounds = favoritesCache;
+
+  if (currentView?.type) {
+    sounds = sounds.filter((s) => s.synth_type === currentView.type);
+  } else if (currentView?.group) {
+    sounds = sounds.filter((s) => TYPE_TO_GROUP[s.synth_type] === currentView.group);
+  }
+
+  if (sounds.length === 0) {
+    const msg =
+      favoritesCache.length === 0
+        ? "No favorites yet. Click ★ on a sound to favorite it."
+        : "No favorites match this filter.";
+    container.innerHTML = `<div class="empty-state">${msg}</div>`;
     return;
   }
   container.innerHTML = sounds.map((s) => cardHTML(s.batch, s)).join("");
 }
 
-function selectFavorites() {
+function selectFavorites(filter = {}) {
   document.querySelectorAll("#batch-list li").forEach((el) => el.classList.remove("active"));
-  document.getElementById("favorites-link").classList.add("active");
   stopPlayback();
-  currentView = { kind: "favorites" };
-  loadFavorites({ render: true });
+  currentView = { kind: "favorites", ...filter };
+  renderFavoritesNav();
+  renderFavoritesView();
 }
 
 function onTitleFocus(input) {
@@ -222,13 +308,13 @@ async function toggleFavorite(btn) {
   btn.textContent = !isFav ? "★" : "☆";
   btn.title = !isFav ? "Unfavorite" : "Favorite";
 
-  // Refresh count and, if in favorites view, the list
+  // Refresh nav counts and re-render so title input appears/disappears
   if (currentView && currentView.kind === "favorites") {
     await loadFavorites({ render: true });
-  } else {
-    // Just update count
-    const sounds = await loadFavorites();
-    void sounds;
+  } else if (currentView && currentView.kind === "batch") {
+    await loadFavorites();
+    const sounds = await (await fetch(`/api/sounds?batch=${encodeURIComponent(currentView.batch)}`)).json();
+    renderSounds(currentView.batch, sounds);
   }
 }
 
@@ -257,7 +343,7 @@ async function loadBatches() {
 async function selectBatch(batch, li) {
   // Update sidebar selection
   document.querySelectorAll("#batch-list li").forEach((el) => el.classList.remove("active"));
-  document.getElementById("favorites-link").classList.remove("active");
+  document.querySelectorAll("#favorites-nav li").forEach((el) => el.classList.remove("active"));
   li.classList.add("active");
 
   stopPlayback();
@@ -555,5 +641,4 @@ async function triggerGenerate() {
 
 buildTypePills();
 restoreBarState();
-document.getElementById("favorites-link").addEventListener("click", selectFavorites);
 loadFavorites().then(loadBatches);
