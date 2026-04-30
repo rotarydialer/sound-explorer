@@ -250,8 +250,36 @@ header h1 {
   margin-bottom: 0.75rem;
 }
 
-#batch-list {
+#batch-list, #favorites-nav {
   list-style: none;
+}
+
+#sidebar h2:not(:first-child) {
+  margin-top: 1.25rem;
+}
+
+#favorites-nav li {
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #b0b0b0;
+}
+
+#favorites-nav li:hover {
+  background: #0f3460;
+}
+
+#favorites-nav li.active {
+  background: #0f3460;
+  color: #ffd166;
+}
+
+#favorites-count {
+  color: #666;
+  margin-left: 0.3rem;
+  font-size: 0.8em;
 }
 
 #batch-list li {
@@ -320,6 +348,78 @@ header h1 {
   border-radius: 10px;
   background: #0f3460;
   color: #4ecdc4;
+}
+
+.sound-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.fav-btn {
+  background: transparent;
+  border: none;
+  color: #555;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.fav-btn:hover {
+  color: #ffd166;
+}
+
+.fav-btn.favorited {
+  color: #ffd166;
+}
+
+.fav-title-row {
+  margin-bottom: 0.4rem;
+}
+
+.fav-title-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffd166;
+}
+
+.fav-title-input::placeholder {
+  color: #555;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.fav-title-input.fav-title-empty {
+  color: #555;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.fav-title-input:hover {
+  border-color: #2a3050;
+}
+
+.fav-title-input:focus {
+  outline: none;
+  border-color: #ffd166;
+  background: #1a1a2e;
+  color: #ffd166;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.sound-batch-ref {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #666;
+  margin-bottom: 0.5rem;
 }
 
 .sound-params {

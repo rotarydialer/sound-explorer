@@ -1,5 +1,12 @@
 let currentAudio = null;
 let currentPlayBtn = null;
+let favoritesSet = new Set();
+let favoriteTitles = new Map(); // key -> title
+let currentView = null; // { kind: "batch", batch } | { kind: "favorites" }
+
+function favKey(batch, name) {
+  return `${batch}::${name}`;
+}
 
 // User-friendly labels for each synth type pill.
 const TYPE_LABELS = {
@@ -113,6 +120,118 @@ function restoreBarState() {
   } catch {}
 }
 
+async function loadFavorites({ render } = { render: false }) {
+  const res = await fetch("/api/favorites");
+  const sounds = await res.json();
+  favoritesSet = new Set(sounds.map((s) => favKey(s.batch, s.name)));
+  favoriteTitles = new Map(
+    sounds.filter((s) => s.favorite_title).map((s) => [favKey(s.batch, s.name), s.favorite_title])
+  );
+  document.getElementById("favorites-count").textContent =
+    sounds.length ? `(${sounds.length})` : "";
+  if (render) renderFavorites(sounds);
+  return sounds;
+}
+
+function renderFavorites(sounds) {
+  const container = document.getElementById("sounds");
+  if (sounds.length === 0) {
+    container.innerHTML = '<div class="empty-state">No favorites yet. Click ★ on a sound to favorite it.</div>';
+    return;
+  }
+  container.innerHTML = sounds.map((s) => cardHTML(s.batch, s)).join("");
+}
+
+function selectFavorites() {
+  document.querySelectorAll("#batch-list li").forEach((el) => el.classList.remove("active"));
+  document.getElementById("favorites-link").classList.add("active");
+  stopPlayback();
+  currentView = { kind: "favorites" };
+  loadFavorites({ render: true });
+}
+
+function onTitleFocus(input) {
+  input.dataset.original = input.value;
+}
+
+function onTitleKeydown(event, input) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    input.blur();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    input.value = input.dataset.original || "";
+    input.blur();
+  }
+}
+
+async function saveFavoriteTitle(input) {
+  const row = input.closest(".fav-title-row");
+  const batch = row.dataset.batch;
+  const name = row.dataset.name;
+  const key = favKey(batch, name);
+  const next = input.value.trim();
+  const current = favoriteTitles.get(key) || "";
+  if (next === current) {
+    input.classList.toggle("fav-title-empty", !next);
+    return;
+  }
+
+  const res = await fetch(
+    `/api/favorites/${encodeURIComponent(batch)}/${encodeURIComponent(name)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: next }),
+    }
+  );
+  if (!res.ok) {
+    input.value = current;
+    return;
+  }
+  const data = await res.json();
+  if (data.title) favoriteTitles.set(key, data.title);
+  else favoriteTitles.delete(key);
+  input.value = data.title || "";
+  input.classList.toggle("fav-title-empty", !data.title);
+}
+
+async function toggleFavorite(btn) {
+  const batch = btn.dataset.batch;
+  const name = btn.dataset.name;
+  const key = favKey(batch, name);
+  const isFav = favoritesSet.has(key);
+
+  const res = await fetch(
+    isFav
+      ? `/api/favorites/${encodeURIComponent(batch)}/${encodeURIComponent(name)}`
+      : "/api/favorites",
+    {
+      method: isFav ? "DELETE" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: isFav ? undefined : JSON.stringify({ batch, name }),
+    }
+  );
+  if (!res.ok) return;
+
+  if (isFav) favoritesSet.delete(key);
+  else favoritesSet.add(key);
+
+  // Update star UI
+  btn.classList.toggle("favorited", !isFav);
+  btn.textContent = !isFav ? "★" : "☆";
+  btn.title = !isFav ? "Unfavorite" : "Favorite";
+
+  // Refresh count and, if in favorites view, the list
+  if (currentView && currentView.kind === "favorites") {
+    await loadFavorites({ render: true });
+  } else {
+    // Just update count
+    const sounds = await loadFavorites();
+    void sounds;
+  }
+}
+
 async function loadBatches() {
   const res = await fetch("/api/batches");
   const batches = await res.json();
@@ -138,9 +257,11 @@ async function loadBatches() {
 async function selectBatch(batch, li) {
   // Update sidebar selection
   document.querySelectorAll("#batch-list li").forEach((el) => el.classList.remove("active"));
+  document.getElementById("favorites-link").classList.remove("active");
   li.classList.add("active");
 
   stopPlayback();
+  currentView = { kind: "batch", batch };
 
   const res = await fetch(`/api/sounds?batch=${encodeURIComponent(batch)}`);
   const sounds = await res.json();
@@ -171,12 +292,29 @@ function cardHTML(batch, sound) {
     ? `<div class="description">${esc(sound.description)}</div>`
     : "";
 
+  const key = favKey(batch, sound.name);
+  const isFav = favoritesSet.has(key);
+  const starChar = isFav ? "★" : "☆";
+  const starClass = isFav ? "fav-btn favorited" : "fav-btn";
+  const title = favoriteTitles.get(key) || "";
+
+  const titleHTML = isFav
+    ? `<div class="fav-title-row" data-batch="${esc(batch)}" data-name="${esc(sound.name)}">
+         <input type="text" class="fav-title-input ${title ? "" : "fav-title-empty"}" value="${esc(title)}" placeholder="Untitled — click to name" onfocus="onTitleFocus(this)" onblur="saveFavoriteTitle(this)" onkeydown="onTitleKeydown(event, this)">
+       </div>`
+    : "";
+
   return `
     <div class="sound-card" id="card-${esc(sound.name)}">
       <div class="sound-card-header">
         <span class="sound-name">${esc(sound.name)}</span>
-        <span class="synth-type">${esc(sound.synth_type)}</span>
+        <div class="sound-card-header-right">
+          <span class="synth-type">${esc(sound.synth_type)}</span>
+          <button class="${starClass}" data-batch="${esc(batch)}" data-name="${esc(sound.name)}" title="${isFav ? "Unfavorite" : "Favorite"}" onclick="toggleFavorite(this)">${starChar}</button>
+        </div>
       </div>
+      ${titleHTML}
+      ${currentView && currentView.kind === "favorites" ? `<div class="sound-batch-ref">${esc(batch)}</div>` : ""}
       <div class="sound-params">${params}</div>
       <div class="sound-controls">
         <button class="play-btn" data-url="${audioUrl}" onclick="togglePlay(this)">Play</button>
@@ -417,4 +555,5 @@ async function triggerGenerate() {
 
 buildTypePills();
 restoreBarState();
-loadBatches();
+document.getElementById("favorites-link").addEventListener("click", selectFavorites);
+loadFavorites().then(loadBatches);

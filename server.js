@@ -6,9 +6,30 @@ const { execFile } = require("child_process");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const OUTPUT_DIR = path.join(__dirname, "output");
+const FAVORITES_FILE = path.join(OUTPUT_DIR, "favorites.json");
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+
+function readFavorites() {
+  if (!fs.existsSync(FAVORITES_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(FAVORITES_FILE, "utf-8"));
+  } catch {
+    return [];
+  }
+}
+
+function writeFavorites(favs) {
+  if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  fs.writeFileSync(FAVORITES_FILE, JSON.stringify(favs, null, 2));
+}
+
+function loadSound(batch, name) {
+  const jsonPath = path.join(OUTPUT_DIR, batch, `${name}.json`);
+  if (!fs.existsSync(jsonPath)) return null;
+  return JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+}
 
 // List all batches, newest first
 app.get("/api/batches", (req, res) => {
@@ -16,7 +37,7 @@ app.get("/api/batches", (req, res) => {
 
   const entries = fs.readdirSync(OUTPUT_DIR, { withFileTypes: true });
   const batches = entries
-    .filter((e) => e.isDirectory())
+    .filter((e) => e.isDirectory() && e.name !== "favorites")
     .map((e) => e.name)
     .sort()
     .reverse();
@@ -82,6 +103,68 @@ app.post("/api/generate", (req, res) => {
     const batch = match ? match[1] : null;
     res.json({ batch, output: stdout });
   });
+});
+
+// List favorited sounds (with full metadata)
+app.get("/api/favorites", (req, res) => {
+  const favs = readFavorites();
+  const sounds = [];
+  for (const f of favs) {
+    const sound = loadSound(f.batch, f.name);
+    if (sound) sounds.push({
+      ...sound,
+      batch: f.batch,
+      favorited_at: f.favorited_at,
+      favorite_title: f.title || null,
+    });
+  }
+  // Newest favorites first
+  sounds.sort((a, b) => (b.favorited_at || "").localeCompare(a.favorited_at || ""));
+  res.json(sounds);
+});
+
+// Toggle/add favorite
+app.post("/api/favorites", (req, res) => {
+  const { batch, name, title } = req.body || {};
+  if (!batch || !name) return res.status(400).json({ error: "batch and name required" });
+  if (!loadSound(batch, name)) return res.status(404).json({ error: "sound not found" });
+
+  const favs = readFavorites();
+  const existing = favs.find((f) => f.batch === batch && f.name === name);
+  if (existing) {
+    if (typeof title === "string") existing.title = title.trim() || undefined;
+    writeFavorites(favs);
+  } else {
+    const entry = { batch, name, favorited_at: new Date().toISOString() };
+    if (typeof title === "string" && title.trim()) entry.title = title.trim();
+    favs.push(entry);
+    writeFavorites(favs);
+  }
+  res.json({ favorited: true });
+});
+
+// Update title on an existing favorite
+app.patch("/api/favorites/:batch/:name", (req, res) => {
+  const { batch, name } = req.params;
+  const { title } = req.body || {};
+  const favs = readFavorites();
+  const fav = favs.find((f) => f.batch === batch && f.name === name);
+  if (!fav) return res.status(404).json({ error: "favorite not found" });
+
+  if (typeof title === "string") {
+    const trimmed = title.trim();
+    if (trimmed) fav.title = trimmed;
+    else delete fav.title;
+  }
+  writeFavorites(favs);
+  res.json({ favorited: true, title: fav.title || null });
+});
+
+app.delete("/api/favorites/:batch/:name", (req, res) => {
+  const { batch, name } = req.params;
+  const favs = readFavorites().filter((f) => !(f.batch === batch && f.name === name));
+  writeFavorites(favs);
+  res.json({ favorited: false });
 });
 
 app.listen(PORT, () => {
