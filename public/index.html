@@ -9,49 +9,64 @@
 <body>
   <header>
     <h1>Sound Explorer</h1>
+    <button id="gen-bar-toggle" onclick="toggleGenerateBar()" title="Show/hide Generate panel">Hide</button>
   </header>
+
+  <section id="generate-bar">
+    <div class="gen-types">
+      <div class="type-group" data-group="classic">
+        <h3>Classic</h3>
+        <div class="type-pills" data-types="fm,subtractive,additive,granular"></div>
+      </div>
+      <div class="type-group" data-group="percussive">
+        <h3>Percussive &amp; Physical</h3>
+        <div class="type-pills" data-types="karplus,modal,drum,physical"></div>
+      </div>
+      <div class="type-group" data-group="vocal">
+        <h3>Vocal &amp; Texture</h3>
+        <div class="type-pills" data-types="formant,noise,stochastic"></div>
+      </div>
+      <div class="type-group" data-group="distortion">
+        <h3>Distortion &amp; Spectral</h3>
+        <div class="type-pills" data-types="waveshape,ringmod"></div>
+      </div>
+      <div class="type-group type-group-samples" data-group="samples">
+        <h3>Sample-based</h3>
+        <div class="type-pills" data-types="granular_sample,timestretch,spectral_morph,cross_synth,convolution"></div>
+      </div>
+    </div>
+
+    <div class="gen-controls">
+      <div class="gen-quick">
+        <span class="gen-quick-label">Quick:</span>
+        <button type="button" onclick="selectTypes('all')">All</button>
+        <button type="button" onclick="selectTypes('none')">None</button>
+        <button type="button" onclick="selectTypes('pure')">Pure only</button>
+        <button type="button" onclick="selectTypes('samples')">Samples only</button>
+      </div>
+
+      <div class="gen-knobs">
+        <label class="gen-knob">
+          <span>Count</span>
+          <input type="number" id="gen-count" value="10" min="1" max="100">
+        </label>
+        <label class="gen-knob">
+          <span>Frequency (Hz)</span>
+          <input type="number" id="gen-freq" placeholder="random" min="20" max="8000" step="1">
+        </label>
+        <label class="gen-knob">
+          <span>Duration (s)</span>
+          <input type="number" id="gen-duration" placeholder="random" min="0.5" step="0.5">
+        </label>
+        <button id="gen-btn" onclick="triggerGenerate()">Generate</button>
+      </div>
+    </div>
+
+    <div id="gen-status"></div>
+  </section>
+
   <div id="layout">
     <nav id="sidebar">
-      <div id="generate-panel">
-        <h2>Generate</h2>
-        <div class="gen-field">
-          <label for="gen-count">Count</label>
-          <input type="number" id="gen-count" value="10" min="1" max="100">
-        </div>
-        <div class="gen-field">
-          <label for="gen-types">Types</label>
-          <select id="gen-types" multiple>
-            <option value="fm" selected>FM</option>
-            <option value="subtractive" selected>Subtractive</option>
-            <option value="additive" selected>Additive</option>
-            <option value="granular" selected>Granular</option>
-            <option value="karplus" selected>Karplus (pluck)</option>
-            <option value="modal" selected>Modal (bell/marimba)</option>
-            <option value="drum" selected>Drum</option>
-            <option value="physical" selected>Physical (waveguide)</option>
-            <option value="formant" selected>Formant (vowel)</option>
-            <option value="noise" selected>Noise (filtered)</option>
-            <option value="stochastic" selected>Stochastic</option>
-            <option value="waveshape" selected>Waveshape</option>
-            <option value="ringmod" selected>Ring mod</option>
-            <option value="granular_sample">Granular (sample)</option>
-            <option value="timestretch">Time stretch (sample)</option>
-            <option value="spectral_morph">Spectral morph (sample)</option>
-            <option value="cross_synth">Cross synthesis (sample)</option>
-            <option value="convolution">Convolution (sample)</option>
-          </select>
-        </div>
-        <div class="gen-field">
-          <label for="gen-freq">Frequency (Hz)</label>
-          <input type="number" id="gen-freq" placeholder="random" min="20" max="8000" step="1">
-        </div>
-        <div class="gen-field">
-          <label for="gen-duration">Duration (s)</label>
-          <input type="number" id="gen-duration" placeholder="random" min="0.5" max="30" step="0.5">
-        </div>
-        <button id="gen-btn" onclick="triggerGenerate()">Generate</button>
-        <div id="gen-status"></div>
-      </div>
       <h2>Batches</h2>
       <ul id="batch-list"></ul>
     </nav>

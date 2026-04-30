@@ -1,6 +1,118 @@
 let currentAudio = null;
 let currentPlayBtn = null;
 
+// User-friendly labels for each synth type pill.
+const TYPE_LABELS = {
+  fm: "FM",
+  subtractive: "Subtractive",
+  additive: "Additive",
+  granular: "Granular",
+  karplus: "Karplus",
+  modal: "Modal",
+  drum: "Drum",
+  physical: "Physical",
+  formant: "Formant",
+  noise: "Noise",
+  stochastic: "Stochastic",
+  waveshape: "Waveshape",
+  ringmod: "Ring mod",
+  granular_sample: "Granular (sample)",
+  timestretch: "Time stretch",
+  spectral_morph: "Spectral morph",
+  cross_synth: "Cross synth",
+  convolution: "Convolution"
+};
+
+const SAMPLE_BASED_TYPES = new Set([
+  "granular_sample", "timestretch", "spectral_morph", "cross_synth", "convolution"
+]);
+
+const STORAGE_KEY = "sound-explorer.selected-types";
+const BAR_HIDDEN_KEY = "sound-explorer.gen-bar-hidden";
+
+function buildTypePills() {
+  const saved = loadSavedTypes();
+
+  document.querySelectorAll(".type-pills").forEach((container) => {
+    const types = container.dataset.types.split(",");
+    types.forEach((t) => {
+      const label = document.createElement("label");
+      label.className = "type-pill";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = t;
+      // Default: pure types selected, sample-based unselected.
+      const defaultChecked = !SAMPLE_BASED_TYPES.has(t);
+      checkbox.checked = saved ? saved.includes(t) : defaultChecked;
+      checkbox.addEventListener("change", () => {
+        label.classList.toggle("checked", checkbox.checked);
+        saveSelectedTypes();
+      });
+      if (checkbox.checked) label.classList.add("checked");
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(TYPE_LABELS[t] || t));
+      container.appendChild(label);
+    });
+  });
+}
+
+function loadSavedTypes() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSelectedTypes() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getSelectedTypes()));
+  } catch {}
+}
+
+function getSelectedTypes() {
+  return Array.from(document.querySelectorAll(".type-pill input"))
+    .filter((c) => c.checked)
+    .map((c) => c.value);
+}
+
+function selectTypes(mode) {
+  document.querySelectorAll(".type-pill input").forEach((checkbox) => {
+    const t = checkbox.value;
+    let checked;
+    switch (mode) {
+      case "all":     checked = true; break;
+      case "none":    checked = false; break;
+      case "pure":    checked = !SAMPLE_BASED_TYPES.has(t); break;
+      case "samples": checked = SAMPLE_BASED_TYPES.has(t); break;
+      default:        checked = checkbox.checked;
+    }
+    checkbox.checked = checked;
+    checkbox.parentElement.classList.toggle("checked", checked);
+  });
+  saveSelectedTypes();
+}
+
+function toggleGenerateBar() {
+  const bar = document.getElementById("generate-bar");
+  const btn = document.getElementById("gen-bar-toggle");
+  const hidden = bar.classList.toggle("hidden");
+  btn.textContent = hidden ? "Show" : "Hide";
+  try {
+    localStorage.setItem(BAR_HIDDEN_KEY, hidden ? "1" : "0");
+  } catch {}
+}
+
+function restoreBarState() {
+  try {
+    if (localStorage.getItem(BAR_HIDDEN_KEY) === "1") {
+      document.getElementById("generate-bar").classList.add("hidden");
+      document.getElementById("gen-bar-toggle").textContent = "Show";
+    }
+  } catch {}
+}
+
 async function loadBatches() {
   const res = await fetch("/api/batches");
   const batches = await res.json();
@@ -245,19 +357,25 @@ async function triggerGenerate() {
   const btn = document.getElementById("gen-btn");
   const status = document.getElementById("gen-status");
   const count = document.getElementById("gen-count").value;
-  const typesSelect = document.getElementById("gen-types");
   const freqInput = document.getElementById("gen-freq").value;
   const durationInput = document.getElementById("gen-duration").value;
 
-  const types = Array.from(typesSelect.selectedOptions).map((o) => o.value).join(",");
+  const selected = getSelectedTypes();
+  status.classList.remove("error");
 
-  const body = { count: parseInt(count), types };
+  if (selected.length === 0) {
+    status.textContent = "Pick at least one synth type.";
+    status.classList.add("error");
+    return;
+  }
+
+  const body = { count: parseInt(count), types: selected.join(",") };
   if (freqInput) body.freq = parseFloat(freqInput);
   if (durationInput) body.duration = parseFloat(durationInput);
 
   btn.disabled = true;
   btn.textContent = "Generating...";
-  status.textContent = "";
+  status.textContent = `Generating ${count} sounds across ${selected.length} type${selected.length === 1 ? "" : "s"}...`;
 
   try {
     const res = await fetch("/api/generate", {
@@ -272,11 +390,13 @@ async function triggerGenerate() {
       data = JSON.parse(text);
     } catch {
       status.textContent = `Server error: ${text.slice(0, 200)}`;
+      status.classList.add("error");
       return;
     }
 
     if (!res.ok) {
       status.textContent = `Error: ${data.error}`;
+      status.classList.add("error");
       return;
     }
 
@@ -288,10 +408,13 @@ async function triggerGenerate() {
     status.textContent = `Created ${data.batch}`;
   } catch (e) {
     status.textContent = `Error: ${e.message}`;
+    status.classList.add("error");
   } finally {
     btn.disabled = false;
     btn.textContent = "Generate";
   }
 }
 
+buildTypePills();
+restoreBarState();
 loadBatches();
