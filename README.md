@@ -122,16 +122,33 @@ caps:
 
 | Module | Max sample length |
 |---|---|
-| `timestretch` | 60 s |
-| `granular_sample` | 30 s |
-| `spectral_morph` | 15 s |
-| `cross_synth` | 15 s |
-| `convolution` (IR) | 5 s |
+| `timestretch` | 180 s |
+| `granular_sample` | 90 s |
+| `spectral_morph` | 45 s |
+| `cross_synth` | 45 s |
+| `convolution` (IR) | 10 s |
 
 Longer files in your library are simply skipped by modules with stricter
 caps. Durations are probed lazily with `ffprobe` and cached in
 `<samples-dir>/.sample_durations.json` so each file is only probed once
 across all runs.
+
+At the start of each batch that uses sample-based types, `generate.rb`
+prints a per-module pool size so you can see how many samples each module
+has to draw from:
+
+```
+Sample library: 4 files in /tmp/test_samples
+  granular_sample  4/4 samples ≤ 90.0s (100%)
+  timestretch      4/4 samples ≤ 180.0s (100%)
+  spectral_morph   3/4 samples ≤ 45.0s (75%)  ⚠ pool is small — bias likely
+  cross_synth      3/4 samples ≤ 45.0s (75%)  ⚠ pool is small — bias likely
+  convolution      2/4 samples ≤ 10.0s (50%)  ⚠ pool is small — bias likely
+```
+
+Pools under 4 samples get a "bias likely" warning — repeated picks will
+visibly cluster around the few survivors. If you see this, either add
+shorter samples to the library or trim long ones with ffmpeg.
 
 #### Practical tips
 

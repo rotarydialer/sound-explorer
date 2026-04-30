@@ -8,7 +8,7 @@ module SynthTimestretch
   # mincer needs the sample loaded into a function table. We cap to keep
   # memory reasonable; longer files can still be used but only a window
   # of them will be read during playback.
-  MAX_SAMPLE_DURATION = 60.0
+  MAX_SAMPLE_DURATION = 180.0
 
   def generate(duration: nil, freq: nil)
     duration ||= rand(2.0..5.0).round(2)

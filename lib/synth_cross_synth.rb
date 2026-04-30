@@ -6,7 +6,7 @@ require_relative "sample_library"
 module SynthCrossSynth
   module_function
 
-  MAX_SAMPLE_DURATION = 15.0
+  MAX_SAMPLE_DURATION = 45.0
 
   def generate(duration: nil, freq: nil)
     duration ||= rand(3.0..6.0).round(2)

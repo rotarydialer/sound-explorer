@@ -6,7 +6,7 @@ require_relative "sample_library"
 module SynthGranularSample
   module_function
 
-  MAX_SAMPLE_DURATION = 30.0 # seconds — GEN01 loads the whole file into RAM
+  MAX_SAMPLE_DURATION = 90.0 # seconds — GEN01 loads the whole file into RAM
 
   def generate(duration: nil, freq: nil)
     duration ||= rand(2.5..6.0).round(2)

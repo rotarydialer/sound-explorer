@@ -108,6 +108,29 @@ module SampleLibrary
     }
   end
 
+  # Probe any uncached durations so subsequent count_under calls are accurate.
+  # Prints progress dots for large libraries. Cheap on subsequent runs.
+  def probe_all!
+    uncached = all.reject { |f| @durations.key?(f) }
+    return if uncached.empty?
+
+    show_progress = uncached.size >= 50
+    print "Probing #{uncached.size} sample#{'s' if uncached.size != 1} for duration" if show_progress
+    uncached.each_with_index do |path, i|
+      duration_of(path)
+      print "." if show_progress && (i + 1) % 25 == 0
+    end
+    puts " done." if show_progress
+    flush_cache
+  end
+
+  # Count samples with a known duration ≤ max_duration.
+  # Files that have not been probed yet are not counted — call probe_all! first
+  # for an accurate number.
+  def count_under(max_duration)
+    all.count { |f| (d = @durations[f]) && d <= max_duration }
+  end
+
   def flush_cache
     return unless @cache_dirty && @cache_path
     File.write(@cache_path, JSON.pretty_generate(@durations))

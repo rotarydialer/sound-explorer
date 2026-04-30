@@ -8,7 +8,7 @@ module SynthConvolution
   module_function
 
   # Keep IRs short — partitioned convolution memory is O(IR length).
-  MAX_IR_DURATION = 5.0
+  MAX_IR_DURATION = 10.0
   PARTITION_LENGTH = 1024
 
   EXCITATIONS = ["pluck", "noise_burst", "tone"].freeze

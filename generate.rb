@@ -46,9 +46,14 @@ SYNTH_TYPES = {
   "convolution"      => SynthConvolution
 }.freeze
 
-SAMPLE_BASED_TYPES = %w[
-  granular_sample timestretch spectral_morph cross_synth convolution
-].freeze
+SAMPLE_BASED_CAPS = {
+  "granular_sample" => SynthGranularSample::MAX_SAMPLE_DURATION,
+  "timestretch"     => SynthTimestretch::MAX_SAMPLE_DURATION,
+  "spectral_morph"  => SynthSpectralMorph::MAX_SAMPLE_DURATION,
+  "cross_synth"     => SynthCrossSynth::MAX_SAMPLE_DURATION,
+  "convolution"     => SynthConvolution::MAX_IR_DURATION
+}.freeze
+SAMPLE_BASED_TYPES = SAMPLE_BASED_CAPS.keys.freeze
 
 options = {
   count: 10,
@@ -116,9 +121,25 @@ end
 
 # Sanity-check sample library availability if any sample-based types are requested
 sample_types_requested = options[:types] & SAMPLE_BASED_TYPES
-if sample_types_requested.any? && SampleLibrary.empty?
-  abort "Sample-based types requested (#{sample_types_requested.join(', ')}) but no samples found in #{SampleLibrary.samples_dir}.\n" \
-        "Set --samples-dir or $SAMPLES_DIR to a directory containing .wav/.aif/.flac files."
+if sample_types_requested.any?
+  if SampleLibrary.empty?
+    abort "Sample-based types requested (#{sample_types_requested.join(', ')}) but no samples found in #{SampleLibrary.samples_dir}.\n" \
+          "Set --samples-dir or $SAMPLES_DIR to a directory containing .wav/.aif/.flac files."
+  end
+
+  # Probe any uncached durations so the pool-size readout below is accurate.
+  SampleLibrary.probe_all!
+
+  total = SampleLibrary.all.size
+  puts "Sample library: #{total} file#{'s' if total != 1} in #{SampleLibrary.samples_dir}"
+  label_width = sample_types_requested.map(&:length).max
+  sample_types_requested.each do |t|
+    cap = SAMPLE_BASED_CAPS[t]
+    n = SampleLibrary.count_under(cap)
+    pct = total > 0 ? (n * 100.0 / total).round : 0
+    warn_marker = n < 4 ? "  ⚠ pool is small — bias likely" : ""
+    puts "  #{t.ljust(label_width)}  #{n}/#{total} samples ≤ #{cap}s (#{pct}%)#{warn_marker}"
+  end
 end
 
 # Create batch directory

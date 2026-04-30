@@ -6,7 +6,7 @@ require_relative "sample_library"
 module SynthSpectralMorph
   module_function
 
-  MAX_SAMPLE_DURATION = 15.0
+  MAX_SAMPLE_DURATION = 45.0
 
   MORPH_SHAPES = ["linear", "reverse", "sine", "random_walk"].freeze
 
