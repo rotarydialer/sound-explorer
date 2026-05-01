@@ -54,6 +54,10 @@ const SAMPLE_BASED_TYPES = new Set(TYPE_GROUPS.samples);
 
 const STORAGE_KEY = "sound-explorer.selected-types";
 const BAR_HIDDEN_KEY = "sound-explorer.gen-bar-hidden";
+const TAB_KEY = "sound-explorer.active-tab";
+
+let lastBatch = null;
+let lastFavFilter = {};
 
 function buildTypePills() {
   const saved = loadSavedTypes();
@@ -146,9 +150,45 @@ async function loadFavorites({ render } = { render: false }) {
   favoriteTitles = new Map(
     sounds.filter((s) => s.favorite_title).map((s) => [favKey(s.batch, s.name), s.favorite_title])
   );
+  document.getElementById("tab-fav-count").textContent =
+    sounds.length ? `(${sounds.length})` : "";
   renderFavoritesNav();
   if (render) renderFavoritesView();
   return sounds;
+}
+
+function getActiveTab() {
+  try {
+    return localStorage.getItem(TAB_KEY) || "batches";
+  } catch {
+    return "batches";
+  }
+}
+
+function setActiveTab(tab, { loadView = true } = {}) {
+  document.querySelectorAll(".sidebar-tab").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === tab);
+  });
+  document.querySelectorAll(".sidebar-pane").forEach((p) => {
+    p.classList.toggle("active", p.id === `sidebar-pane-${tab}`);
+  });
+  try { localStorage.setItem(TAB_KEY, tab); } catch {}
+
+  if (!loadView) return;
+
+  if (tab === "favorites") {
+    selectFavorites(lastFavFilter);
+  } else {
+    if (lastBatch) {
+      const li = [...document.querySelectorAll("#batch-list li")].find(
+        (el) => el.textContent === lastBatch
+      );
+      if (li) selectBatch(lastBatch, li);
+    } else {
+      const first = document.querySelector("#batch-list li");
+      if (first) selectBatch(first.textContent, first);
+    }
+  }
 }
 
 function renderFavoritesNav() {
@@ -232,6 +272,7 @@ function selectFavorites(filter = {}) {
   document.querySelectorAll("#batch-list li").forEach((el) => el.classList.remove("active"));
   stopPlayback();
   currentView = { kind: "favorites", ...filter };
+  lastFavFilter = filter;
   renderFavoritesNav();
   renderFavoritesView();
 }
@@ -329,14 +370,15 @@ async function loadBatches() {
     return;
   }
 
+  const activeTab = getActiveTab();
   batches.forEach((batch, i) => {
     const li = document.createElement("li");
     li.textContent = batch;
     li.addEventListener("click", () => selectBatch(batch, li));
     list.appendChild(li);
 
-    // Auto-select the newest batch
-    if (i === 0) selectBatch(batch, li);
+    // Auto-select the newest batch only if we're on the batches tab
+    if (i === 0 && activeTab === "batches") selectBatch(batch, li);
   });
 }
 
@@ -348,6 +390,7 @@ async function selectBatch(batch, li) {
 
   stopPlayback();
   currentView = { kind: "batch", batch };
+  lastBatch = batch;
 
   const res = await fetch(`/api/sounds?batch=${encodeURIComponent(batch)}`);
   const sounds = await res.json();
@@ -641,4 +684,13 @@ async function triggerGenerate() {
 
 buildTypePills();
 restoreBarState();
-loadFavorites().then(loadBatches);
+
+document.querySelectorAll(".sidebar-tab").forEach((btn) => {
+  btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+});
+
+setActiveTab(getActiveTab(), { loadView: false });
+loadFavorites().then(async () => {
+  await loadBatches();
+  if (getActiveTab() === "favorites") selectFavorites();
+});

@@ -67,10 +67,16 @@
 
   <div id="layout">
     <nav id="sidebar">
-      <h2>Favorites</h2>
-      <ul id="favorites-nav"></ul>
-      <h2>Batches</h2>
-      <ul id="batch-list"></ul>
+      <div id="sidebar-tabs">
+        <button class="sidebar-tab active" data-tab="batches">Batches</button>
+        <button class="sidebar-tab" data-tab="favorites">Favorites <span id="tab-fav-count"></span></button>
+      </div>
+      <div id="sidebar-pane-batches" class="sidebar-pane active">
+        <ul id="batch-list"></ul>
+      </div>
+      <div id="sidebar-pane-favorites" class="sidebar-pane">
+        <ul id="favorites-nav"></ul>
+      </div>
     </nav>
     <main id="main">
       <div id="sounds"></div>
