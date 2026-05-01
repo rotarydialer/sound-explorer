@@ -494,6 +494,21 @@ function cardHTML(batch, sound) {
       ${tagsHTML}
       ${descHTML}
       <div class="sound-detail">
+        <h3>Re-drive</h3>
+        <div class="redrive" data-name="${esc(sound.name)}" data-synth-type="${esc(sound.synth_type)}">
+          <div class="redrive-row">
+            <label class="redrive-knob">
+              <span>Frequency (Hz)</span>
+              <input type="number" class="redrive-freq" min="20" max="8000" step="1" value="${primaryFreq(sound) ?? ""}" placeholder="random">
+            </label>
+            <label class="redrive-knob">
+              <span>Duration (s)</span>
+              <input type="number" class="redrive-duration" min="0.5" step="0.5" value="${sound.duration_seconds}" placeholder="random">
+            </label>
+            <button class="redrive-btn" onclick="redriveSound(this)">Re-drive (${esc(sound.synth_type)})</button>
+          </div>
+          <div class="redrive-status"></div>
+        </div>
         <h3>Parameters</h3>
         <pre>${esc(JSON.stringify(sound.params, null, 2))}</pre>
         <h3>CSD</h3>
@@ -501,6 +516,64 @@ function cardHTML(batch, sound) {
       </div>
     </div>
   `;
+}
+
+function primaryFreq(sound) {
+  const p = sound.params || {};
+  const candidates = [
+    p.carrier_freq, p.base_freq, p.fundamental, p.center_freq, p.body_freq,
+  ];
+  for (const v of candidates) if (typeof v === "number") return v;
+  return null;
+}
+
+async function redriveSound(btn) {
+  const wrap = btn.closest(".redrive");
+  const status = wrap.querySelector(".redrive-status");
+  const synthType = wrap.dataset.synthType;
+  const freqInput = wrap.querySelector(".redrive-freq").value;
+  const durationInput = wrap.querySelector(".redrive-duration").value;
+
+  const body = { count: 1, types: synthType };
+  if (freqInput) body.freq = parseFloat(freqInput);
+  if (durationInput) body.duration = parseFloat(durationInput);
+
+  btn.disabled = true;
+  btn.textContent = "Re-driving...";
+  status.classList.remove("error");
+  status.textContent = "Generating...";
+
+  try {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch {
+      status.textContent = `Server error: ${text.slice(0, 200)}`;
+      status.classList.add("error");
+      return;
+    }
+    if (!res.ok) {
+      status.textContent = `Error: ${data.error}`;
+      status.classList.add("error");
+      return;
+    }
+
+    status.textContent = `Created ${data.batch}`;
+    setActiveTab("batches", { loadView: false });
+    document.getElementById("batch-list").innerHTML = "";
+    lastBatch = data.batch;
+    await loadBatches();
+  } catch (e) {
+    status.textContent = `Error: ${e.message}`;
+    status.classList.add("error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = `Re-drive (${synthType})`;
+  }
 }
 
 function formatParams(sound) {
