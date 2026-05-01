@@ -72,6 +72,8 @@
         <button class="sidebar-tab" data-tab="favorites">Favorites <span id="tab-fav-count"></span></button>
       </div>
       <div id="sidebar-pane-batches" class="sidebar-pane active">
+        <button id="cleanup-btn" class="sidebar-action" onclick="cleanupNonFavorites()" title="Move every non-favorited sound into the trash/ directory">🗑️ Clean Up</button>
+        <div id="cleanup-status"></div>
         <ul id="batch-list"></ul>
       </div>
       <div id="sidebar-pane-favorites" class="sidebar-pane">

@@ -359,6 +359,47 @@ async function toggleFavorite(btn) {
   }
 }
 
+async function cleanupNonFavorites() {
+  const status = document.getElementById("cleanup-status");
+  const btn = document.getElementById("cleanup-btn");
+
+  const favCount = favoritesCache.length;
+  const ok = confirm(
+    `Move every non-favorited sound into the trash/ directory?\n\n` +
+      `${favCount} favorite${favCount === 1 ? "" : "s"} will be kept.\n` +
+      `Empty batches will be removed.`
+  );
+  if (!ok) return;
+
+  btn.disabled = true;
+  status.textContent = "Cleaning up...";
+  status.classList.remove("error");
+
+  try {
+    const res = await fetch("/api/cleanup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "cleanup failed");
+
+    status.textContent = `Moved ${data.moved} sound${data.moved === 1 ? "" : "s"} to trash/${
+      data.batches_emptied ? `, removed ${data.batches_emptied} empty batch${data.batches_emptied === 1 ? "" : "es"}` : ""
+    }.`;
+
+    // Reload sidebar + view
+    document.getElementById("batch-list").innerHTML = "";
+    lastBatch = null;
+    currentView = null;
+    await loadBatches();
+    if (getActiveTab() === "favorites") {
+      await loadFavorites({ render: true });
+    }
+  } catch (e) {
+    status.textContent = `Error: ${e.message}`;
+    status.classList.add("error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function loadBatches() {
   const res = await fetch("/api/batches");
   const batches = await res.json();

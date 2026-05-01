@@ -293,6 +293,39 @@ header h1 {
   display: block;
 }
 
+.sidebar-action {
+  width: 100%;
+  background: transparent;
+  color: #b0b0b0;
+  border: 1px solid #2a3050;
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-action:hover {
+  border-color: #ffb86b;
+  color: #ffb86b;
+}
+
+.sidebar-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#cleanup-status {
+  font-size: 0.72rem;
+  color: #888;
+  margin-bottom: 0.5rem;
+  min-height: 0.9em;
+}
+
+#cleanup-status.error {
+  color: #ffb86b;
+}
+
 #batch-list, #favorites-nav {
   list-style: none;
 }

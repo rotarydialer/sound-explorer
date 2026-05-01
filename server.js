@@ -6,6 +6,7 @@ const { execFile } = require("child_process");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const OUTPUT_DIR = path.join(__dirname, "output");
+const TRASH_DIR = path.join(__dirname, "trash");
 const FAVORITES_FILE = path.join(OUTPUT_DIR, "favorites.json");
 
 app.use(express.json());
@@ -37,7 +38,15 @@ app.get("/api/batches", (req, res) => {
 
   const entries = fs.readdirSync(OUTPUT_DIR, { withFileTypes: true });
   const batches = entries
-    .filter((e) => e.isDirectory() && e.name !== "favorites")
+    .filter((e) => e.isDirectory())
+    .filter((e) => {
+      const dir = path.join(OUTPUT_DIR, e.name);
+      try {
+        return fs.readdirSync(dir).some((f) => f.endsWith(".json"));
+      } catch {
+        return false;
+      }
+    })
     .map((e) => e.name)
     .sort()
     .reverse();
@@ -165,6 +174,55 @@ app.delete("/api/favorites/:batch/:name", (req, res) => {
   const favs = readFavorites().filter((f) => !(f.batch === batch && f.name === name));
   writeFavorites(favs);
   res.json({ favorited: false });
+});
+
+// Soft-delete (move to trash/) all non-favorited sounds. Body { batch? } scopes to one batch.
+app.post("/api/cleanup", (req, res) => {
+  const { batch } = req.body || {};
+  if (!fs.existsSync(OUTPUT_DIR)) return res.json({ moved: 0, batches_emptied: 0 });
+
+  const favSet = new Set(readFavorites().map((f) => `${f.batch}::${f.name}`));
+
+  let batches;
+  if (batch) {
+    batches = [batch];
+  } else {
+    batches = fs.readdirSync(OUTPUT_DIR, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+  }
+
+  let moved = 0;
+  let emptied = 0;
+
+  for (const b of batches) {
+    const batchDir = path.join(OUTPUT_DIR, b);
+    if (!fs.existsSync(batchDir) || !fs.statSync(batchDir).isDirectory()) continue;
+
+    const files = fs.readdirSync(batchDir);
+    const jsonNames = files.filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5));
+    const keptNames = new Set(jsonNames.filter((n) => favSet.has(`${b}::${n}`)));
+    const trashBatchDir = path.join(TRASH_DIR, b);
+
+    for (const f of files) {
+      // Map a file to its sound name: strip the last extension.
+      const dot = f.lastIndexOf(".");
+      const name = dot === -1 ? f : f.slice(0, dot);
+      if (keptNames.has(name)) continue;
+
+      fs.mkdirSync(trashBatchDir, { recursive: true });
+      fs.renameSync(path.join(batchDir, f), path.join(trashBatchDir, f));
+      if (f.endsWith(".json")) moved++;
+    }
+
+    const remaining = fs.readdirSync(batchDir);
+    if (remaining.length === 0) {
+      fs.rmdirSync(batchDir);
+      emptied++;
+    }
+  }
+
+  res.json({ moved, batches_emptied: emptied });
 });
 
 app.listen(PORT, () => {
