@@ -1,44 +1,37 @@
 require_relative "sample_library"
+require_relative "param_override"
 
-# Phase-vocoder time-stretch and pitch-shift of a sample, decoupled.
-# Uses `mincer` — single opcode, streams from a function table.
 module SynthTimestretch
   module_function
 
-  # mincer needs the sample loaded into a function table. We cap to keep
-  # memory reasonable; longer files can still be used but only a window
-  # of them will be read during playback.
   MAX_SAMPLE_DURATION = 180.0
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(2.0..5.0).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(2.0..5.0).round(2) }
 
-    sample_path = SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+    sample_path =
+      if (rel = ParamOverride.get(o, :sample)) && rel != ParamOverride::MISSING
+        SampleLibrary.resolve(rel) || SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+      else
+        SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+      end
     sample_dur = SampleLibrary.duration_of(sample_path) || MAX_SAMPLE_DURATION
 
-    # Stretch factor: how much slower (>1) or faster (<1) than original.
-    stretch = rand(0.25..4.0).round(3)
-
-    # Pitch shift in semitones, independent of stretch.
-    pitch_semitones = rand(-12.0..12.0).round(2)
+    stretch = ParamOverride.fetch(o, :stretch) { rand(0.25..4.0).round(3) }
+    pitch_semitones = ParamOverride.fetch(o, :pitch_semitones) { rand(-12.0..12.0).round(2) }
     pitch_ratio = (2.0 ** (pitch_semitones / 12.0)).round(5)
 
-    # How much of the file to traverse during playback. With stretch=2 and
-    # p3=4s, we read p3/stretch = 2s of source material.
     source_window = (duration / stretch).round(3)
-
-    # Pick a start position that keeps the read inside the file.
     max_start = [sample_dur - source_window, 0.0].max
-    start_pos = max_start > 0 ? rand(0.0..max_start).round(3) : 0.0
-    end_pos = (start_pos + source_window).round(3)
+    start_pos = ParamOverride.fetch(o, :start_position) { max_start > 0 ? rand(0.0..max_start).round(3) : 0.0 }
+    end_pos = ParamOverride.fetch(o, :end_position) { (start_pos + source_window).round(3) }
 
-    # Lock formants: 1 keeps formant freqs fixed when pitch-shifting (voice-like).
-    lock_formants = rand < 0.4 ? 1 : 0
+    lock_formants = ParamOverride.fetch(o, :lock_formants) { rand < 0.4 ? 1 : 0 }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.5..0.8).round(2) }
 
-    amplitude = rand(0.5..0.8).round(2)
-
-    attack = rand(0.05..0.3).round(3)
-    release = rand(0.1..0.4).round(3)
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.05..0.3).round(3) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.1..0.4).round(3) }
     if attack + release > duration * 0.9
       scale = (duration * 0.9) / (attack + release)
       attack = (attack * scale).round(3)
@@ -72,7 +65,6 @@ module SynthTimestretch
         iamp = #{amplitude}
         ipitch = #{pitch_ratio}
 
-        ; Time pointer: walk from start_pos to end_pos over the playback duration.
         atime line #{start_pos}, p3, #{end_pos}
 
         asnd mincer atime, iamp, ipitch, 1, #{lock_formants}

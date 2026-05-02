@@ -1,34 +1,30 @@
+require_relative "param_override"
+
 module SynthWaveshape
   module_function
 
-  # Source oscillators — each gives the distortion stage a different starting
-  # spectrum. Sine + heavy distort1 = harmonically rich; saw already has
-  # harmonics so distort1 just adds odd-order character.
   SOURCES = ["sine", "saw", "square", "triangle"].freeze
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(1.5..4.0).round(2)
-    base_freq = freq || rand(80.0..600.0).round(2)
-    source = SOURCES.sample
-    amplitude = rand(0.4..0.7).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(1.5..4.0).round(2) }
+    base_freq = ParamOverride.fetch(o, :base_freq) { freq || rand(80.0..600.0).round(2) }
+    source = ParamOverride.fetch(o, :source) { SOURCES.sample }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.4..0.7).round(2) }
 
-    # Drive sweeps over the duration — gives a "filling out" character.
-    drive_start = rand(0.5..2.0).round(3)
-    drive_end = rand(2.0..12.0).round(3)
-    post_gain = rand(0.4..0.8).round(3)
+    drive_start = ParamOverride.fetch(o, :drive, :start) { rand(0.5..2.0).round(3) }
+    drive_end = ParamOverride.fetch(o, :drive, :end) { rand(2.0..12.0).round(3) }
+    post_gain = ParamOverride.fetch(o, :post_gain) { rand(0.4..0.8).round(3) }
 
-    # distort1 shape parameters: kshape1 = positive shape, kshape2 = negative.
-    # Asymmetric shapes give richer even-order content.
-    shape1 = rand(0.0..0.8).round(3)
-    shape2 = rand(0.0..0.8).round(3)
+    shape1 = ParamOverride.fetch(o, :shape, :shape1) { rand(0.0..0.8).round(3) }
+    shape2 = ParamOverride.fetch(o, :shape, :shape2) { rand(0.0..0.8).round(3) }
 
-    # Tame highs after distortion
-    tone_cutoff = rand(1500.0..6000.0).round(0)
+    tone_cutoff = ParamOverride.fetch(o, :tone_cutoff) { rand(1500.0..6000.0).round(0) }
 
-    attack = rand(0.01..0.2).round(3)
-    decay = rand(0.05..0.4).round(3)
-    sustain = rand(0.4..0.9).round(2)
-    release = rand(0.1..0.6).round(3)
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.01..0.2).round(3) }
+    decay = ParamOverride.fetch(o, :envelope, :decay) { rand(0.05..0.4).round(3) }
+    sustain = ParamOverride.fetch(o, :envelope, :sustain) { rand(0.4..0.9).round(2) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.1..0.6).round(3) }
     if attack + decay + release > duration * 0.9
       scale = (duration * 0.9) / (attack + decay + release)
       attack = (attack * scale).round(3)
@@ -75,7 +71,6 @@ module SynthWaveshape
 
         adist distort1 asrc, kdrive, #{post_gain}, #{shape1}, #{shape2}
 
-        ; Lowpass to tame fizzy highs created by the distortion
         afilt tone adist, #{tone_cutoff}
 
         kenv madsr #{attack}, #{decay}, #{sustain}, #{release}

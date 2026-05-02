@@ -703,6 +703,53 @@ header h1 {
   color: #ffb86b;
 }
 
+.redrive-reset, .redrive-clear {
+  background: transparent;
+  color: #b0b0b0;
+  border: 1px solid #2a3050;
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  height: 2rem;
+}
+
+.redrive-reset:hover, .redrive-clear:hover {
+  border-color: #4ecdc4;
+  color: #4ecdc4;
+}
+
+.redrive-params-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.redrive-params {
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 0.5rem;
+  font-family: monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  resize: vertical;
+  text-transform: none;
+  letter-spacing: normal;
+  width: 100%;
+}
+
+.redrive-params:focus {
+  outline: none;
+  border-color: #4ecdc4;
+}
+
 /* Empty state */
 .empty-state {
   text-align: center;

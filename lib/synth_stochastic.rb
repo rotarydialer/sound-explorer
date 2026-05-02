@@ -1,31 +1,40 @@
+require_relative "param_override"
+
 module SynthStochastic
   module_function
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(3.0..7.0).round(2)
-    center_freq = freq || rand(120.0..600.0).round(2)
-    voice_count = rand(3..6)
-    amplitude = rand(0.25..0.5).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(3.0..7.0).round(2) }
+    center_freq = ParamOverride.fetch(o, :center_freq) { freq || rand(120.0..600.0).round(2) }
+    voice_count = ParamOverride.fetch(o, :voice_count) { rand(3..6) }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.25..0.5).round(2) }
 
-    # Each voice has its own frequency offset and random-walk parameters
-    voices = voice_count.times.map do |i|
-      offset_ratio = rand(0.5..2.5).round(3)
-      drift_amount = rand(2.0..40.0).round(2)   # Hz of drift around the offset
-      drift_rate   = rand(0.3..3.0).round(3)    # Hz, frequency of randi updates
+    voices = ParamOverride.fetch(o, :voices) do
+      voice_count.times.map do |i|
+        {
+          offset_ratio: rand(0.5..2.5).round(3),
+          drift_amount: rand(2.0..40.0).round(2),
+          drift_rate: rand(0.3..3.0).round(3),
+          seed: i + 1
+        }
+      end
+    end
+    voices = voices.map do |v|
       {
-        offset_ratio: offset_ratio,
-        drift_amount: drift_amount,
-        drift_rate: drift_rate,
-        seed: i + 1
+        offset_ratio: v[:offset_ratio] || v["offset_ratio"],
+        drift_amount: v[:drift_amount] || v["drift_amount"],
+        drift_rate: v[:drift_rate] || v["drift_rate"],
+        seed: v[:seed] || v["seed"]
       }
     end
+    voice_count = voices.size
 
-    flicker_rate = rand(2.0..15.0).round(2)
-    flicker_depth = rand(0.2..0.5).round(3)
+    flicker_rate = ParamOverride.fetch(o, :flicker, :rate) { rand(2.0..15.0).round(2) }
+    flicker_depth = ParamOverride.fetch(o, :flicker, :depth) { rand(0.2..0.5).round(3) }
 
-    # Slow overall envelope for swelling pad-like behaviour
-    attack = rand(0.5..2.0).round(3)
-    release = rand(0.8..2.5).round(3)
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.5..2.0).round(3) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.8..2.5).round(3) }
     if attack + release > duration * 0.9
       scale = (duration * 0.9) / (attack + release)
       attack = (attack * scale).round(3)
@@ -69,7 +78,6 @@ module SynthStochastic
       instr 1
       #{voice_lines.join("\n")}
 
-        ; Random amplitude flicker over the whole sound
         kflick randi #{flicker_depth}, #{flicker_rate}, #{voice_count + 1}
         kflickenv = 1 - #{flicker_depth} + kflick
 

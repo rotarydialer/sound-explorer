@@ -1,28 +1,28 @@
+require_relative "param_override"
+
 module SynthNoise
   module_function
 
   COLORS = ["white", "pink"].freeze
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(2.0..6.0).round(2)
-    color = COLORS.sample
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(2.0..6.0).round(2) }
+    color = ParamOverride.fetch(o, :color) { COLORS.sample }
 
-    # Center frequency sweeps from start to end (some swell upward, some down)
-    start_cut = freq || rand(200.0..3000.0).round(2)
-    sweep_octaves = rand(-2.0..2.0).round(2)
-    end_cut = (start_cut * (2.0 ** sweep_octaves)).round(2).clamp(60.0, 12000.0)
+    start_cut = ParamOverride.fetch(o, :cutoff_start) { freq || rand(200.0..3000.0).round(2) }
+    sweep_octaves = ParamOverride.fetch(o, :sweep_octaves) { rand(-2.0..2.0).round(2) }
+    end_cut = ParamOverride.fetch(o, :cutoff_end) { (start_cut * (2.0 ** sweep_octaves)).round(2).clamp(60.0, 12000.0) }
 
-    # Bandwidth: narrower = more pitched/whistly, wider = swooshier
-    bandwidth = rand(50.0..600.0).round(1)
-    amplitude = rand(0.3..0.6).round(2)
+    bandwidth = ParamOverride.fetch(o, :bandwidth) { rand(50.0..600.0).round(1) }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.3..0.6).round(2) }
+    filter_type = ParamOverride.fetch(o, :filter) { ["butterbp", "resonz"].sample }
+    gain_comp = ParamOverride.fetch(o, :gain_compensation) do
+      filter_type == "butterbp" ? rand(6.0..14.0).round(2) : rand(2.0..5.0).round(2)
+    end
 
-    # Resonant (resonz) or smooth (butterbp) bandpass
-    filter_type = ["butterbp", "resonz"].sample
-    # resonz needs less gain compensation; butterbp loses more energy
-    gain_comp = filter_type == "butterbp" ? rand(6.0..14.0).round(2) : rand(2.0..5.0).round(2)
-
-    attack = rand(0.2..1.5).round(3)
-    release = rand(0.3..2.0).round(3)
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.2..1.5).round(3) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.3..2.0).round(3) }
     if attack + release > duration * 0.9
       scale = (duration * 0.9) / (attack + release)
       attack = (attack * scale).round(3)
@@ -69,7 +69,6 @@ module SynthNoise
         aenv linseg 0, #{attack}, 1, p3 - #{attack} - #{release}, 1, #{release}, 0
         aout = afilt * aenv * iamp
 
-        ; Safety clip — band-pass output can be unpredictable
         aout clip aout, 0, 0.95
 
         outs aout, aout

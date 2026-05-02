@@ -1,28 +1,29 @@
 require_relative "sample_library"
+require_relative "param_override"
 
-# Partitioned convolution: a synthesised excitation signal (pluck or noise
-# burst) convolved with a sample acting as an impulse response. Convolution
-# with a real IR → reverb. Convolution with a percussive sample → that
-# sample's resonant body imposed onto the excitation.
 module SynthConvolution
   module_function
 
-  # Keep IRs short — partitioned convolution memory is O(IR length).
   MAX_IR_DURATION = 10.0
   PARTITION_LENGTH = 1024
-
   EXCITATIONS = ["pluck", "noise_burst", "tone"].freeze
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(2.0..5.0).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(2.0..5.0).round(2) }
 
-    ir_path = SampleLibrary.pick(max_duration: MAX_IR_DURATION)
+    ir_path =
+      if (rel = ParamOverride.get(o, :impulse_response)) && rel != ParamOverride::MISSING
+        SampleLibrary.resolve(rel) || SampleLibrary.pick(max_duration: MAX_IR_DURATION)
+      else
+        SampleLibrary.pick(max_duration: MAX_IR_DURATION)
+      end
     ir_dur = SampleLibrary.duration_of(ir_path) || MAX_IR_DURATION
 
-    excitation = EXCITATIONS.sample
-    excite_freq = freq || rand(80.0..600.0).round(2)
-    excite_amp = rand(0.5..0.8).round(2)
-    excite_dur = rand(0.05..0.3).round(3)
+    excitation = ParamOverride.fetch(o, :excitation) { EXCITATIONS.sample }
+    excite_freq = ParamOverride.fetch(o, :excitation_freq) { freq || rand(80.0..600.0).round(2) }
+    excite_amp = ParamOverride.fetch(o, :excitation_amplitude) { rand(0.5..0.8).round(2) }
+    excite_dur = ParamOverride.fetch(o, :excitation_duration) { rand(0.05..0.3).round(3) }
 
     excite_lines =
       case excitation
@@ -46,8 +47,8 @@ module SynthConvolution
         LINES
       end
 
-    wet_dry = rand(0.6..1.0).round(3)
-    output_gain = rand(0.4..0.9).round(3)
+    wet_dry = ParamOverride.fetch(o, :wet_dry) { rand(0.6..1.0).round(3) }
+    output_gain = ParamOverride.fetch(o, :output_gain) { rand(0.4..0.9).round(3) }
 
     params = {
       impulse_response: relative_sample_path(ir_path),
@@ -75,10 +76,8 @@ module SynthConvolution
       seed 0
 
       instr 1
-        ; Excitation signal
         #{excite_lines.gsub("\n", "\n        ")}
 
-        ; Convolve with the IR sample loaded in table 1.
         awet ftconv adry, 1, #{PARTITION_LENGTH}
 
         amix = (awet * #{wet_dry}) + (adry * #{(1.0 - wet_dry).round(3)})

@@ -1,26 +1,27 @@
+require_relative "param_override"
+
 module SynthGranular
   module_function
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(2.0..6.0).round(2)
-    base_freq = freq || rand(100.0..800.0).round(2)
-    grain_density = rand(5.0..80.0).round(1)     # grains per second
-    grain_dur = rand(0.01..0.15).round(4)          # seconds per grain
-    pitch_scatter = rand(0.0..2.0).round(3)        # semitones of random scatter
-    amplitude = rand(0.3..0.7).round(2)
+  GEN10_BY_WAVEFORM = {
+    "sine"   => "1",
+    "bright" => "1 0.5 0.3 0.2 0.1",
+    "hollow" => "1 0 0.3 0 0.1"
+  }.freeze
 
-    # Source waveform for grains: sine, triangle, or sawtooth
-    # Using GEN10 for different timbres
-    waveform_type = ["sine", "bright", "hollow"].sample
-    gen10_args = case waveform_type
-                 when "sine"   then "1"
-                 when "bright" then "1 0.5 0.3 0.2 0.1"
-                 when "hollow" then "1 0 0.3 0 0.1"
-                 end
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(2.0..6.0).round(2) }
+    base_freq = ParamOverride.fetch(o, :base_freq) { freq || rand(100.0..800.0).round(2) }
+    grain_density = ParamOverride.fetch(o, :grain_density) { rand(5.0..80.0).round(1) }
+    grain_dur = ParamOverride.fetch(o, :grain_duration) { rand(0.01..0.15).round(4) }
+    pitch_scatter = ParamOverride.fetch(o, :pitch_scatter_semitones) { rand(0.0..2.0).round(3) }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.3..0.7).round(2) }
+    waveform_type = ParamOverride.fetch(o, :waveform_type) { GEN10_BY_WAVEFORM.keys.sample }
+    gen10_args = GEN10_BY_WAVEFORM.fetch(waveform_type, "1")
 
-    # Amplitude envelope for the overall sound
-    attack = rand(0.2..1.5).round(3)
-    release = rand(0.3..1.5).round(3)
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.2..1.5).round(3) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.3..1.5).round(3) }
     if attack + release > duration * 0.9
       scale = (duration * 0.9) / (attack + release)
       attack = (attack * scale).round(3)
@@ -37,7 +38,6 @@ module SynthGranular
       envelope: { attack: attack, release: release }
     }
 
-    # pitch_scatter as a frequency ratio range
     scatter_ratio = 2.0 ** (pitch_scatter / 12.0)
 
     csd = <<~CSD
@@ -59,27 +59,18 @@ module SynthGranular
         idens = #{grain_density}
         igdur = #{grain_dur}
 
-        ; Overall amplitude envelope (fade in/out)
         kenv linseg 0, #{attack}, 1, #{duration} - #{attack} - #{release}, 1, #{release}, 0
 
-        ; Grain generation using granule opcode alternative:
-        ; We use fog for overlapping grains with pitch variation
-        ; Simple approach: use multiple random-triggered grains via schedkwhen
-
-        ; Randomized pitch per k-cycle
         krand randi #{(scatter_ratio - 1).round(6)}, idens
         kpitch = ifreq * (1 + krand)
 
-        ; Grain stream using grain opcode
         aout grain iamp * kenv, kpitch, idens, 0, 0, igdur, 1, 1, 0.5
 
         outs aout, aout
       endin
       </CsInstruments>
       <CsScore>
-      ; Grain waveform table
       f 1 0 4096 10 #{gen10_args}
-      ; Hanning window for grain envelope
       f 2 0 4096 20 2
 
       i 1 0 #{duration}

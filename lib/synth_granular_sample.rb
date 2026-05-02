@@ -1,37 +1,33 @@
 require_relative "sample_library"
+require_relative "param_override"
 
-# Granular synthesis from a recorded sample.
-# Uses Csound's `syncgrain` opcode to read tiny windowed slices of the
-# sample at a controllable density, pitch, and read-rate.
 module SynthGranularSample
   module_function
 
-  MAX_SAMPLE_DURATION = 90.0 # seconds — GEN01 loads the whole file into RAM
+  MAX_SAMPLE_DURATION = 90.0
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(2.5..6.0).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(2.5..6.0).round(2) }
 
-    sample_path = SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+    sample_path =
+      if (rel = ParamOverride.get(o, :sample)) && rel != ParamOverride::MISSING
+        SampleLibrary.resolve(rel) || SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+      else
+        SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+      end
     sample_dur = SampleLibrary.duration_of(sample_path) || MAX_SAMPLE_DURATION
 
-    # Pitch: full ratio (independent of grain read-rate). 1.0 = original pitch.
-    pitch_semitones = rand(-12.0..12.0).round(2)
+    pitch_semitones = ParamOverride.fetch(o, :pitch_semitones) { rand(-12.0..12.0).round(2) }
     pitch_ratio = (2.0 ** (pitch_semitones / 12.0)).round(5)
 
-    # Grain size in seconds. Small = blurry cloud, large = recognisable fragments.
-    grain_size = rand(0.02..0.20).round(4)
+    grain_size = ParamOverride.fetch(o, :grain_size) { rand(0.02..0.20).round(4) }
+    pointer_rate = ParamOverride.fetch(o, :pointer_rate) { rand(0.0..1.5).round(3) }
+    grain_density = ParamOverride.fetch(o, :grain_density) { rand(20.0..120.0).round(1) }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.4..0.7).round(2) }
 
-    # Pointer rate — how fast we read through the file.
-    # 0 = freeze on a position, 1 = real-time, 0.25 = 4× stretch, 2 = 2× faster.
-    pointer_rate = rand(0.0..1.5).round(3)
-
-    # Grain density (grains per second). Higher = denser texture.
-    grain_density = rand(20.0..120.0).round(1)
-
-    amplitude = rand(0.4..0.7).round(2)
-
-    attack = rand(0.1..0.8).round(3)
-    release = rand(0.2..1.2).round(3)
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.1..0.8).round(3) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.2..1.2).round(3) }
     if attack + release > duration * 0.9
       scale = (duration * 0.9) / (attack + release)
       attack = (attack * scale).round(3)
@@ -78,9 +74,7 @@ module SynthGranularSample
       endin
       </CsInstruments>
       <CsScore>
-      ; GEN01: load source sample into table 1 (size 0 = use file's natural size)
       f 1 0 0 1 "#{sample_path}" 0 0 1
-      ; Hanning window for grain envelope
       f 2 0 8192 20 2
       i 1 0 #{duration}
       </CsScore>

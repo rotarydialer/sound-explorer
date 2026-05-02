@@ -1,8 +1,8 @@
+require_relative "param_override"
+
 module SynthModal
   module_function
 
-  # Inharmonic ratios characteristic of struck-object resonators.
-  # Each entry represents the modes (relative to fundamental) of a real-ish object.
   PRESETS = {
     "bell"       => [1.0, 2.756, 5.404, 8.933, 13.345],
     "marimba"    => [1.0, 3.932, 9.538, 16.688],
@@ -11,25 +11,26 @@ module SynthModal
     "wood_block" => [1.0, 1.99, 3.41, 5.12]
   }.freeze
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(1.5..4.0).round(2)
-    base_freq = freq || rand(120.0..1500.0).round(2)
-    preset_name = PRESETS.keys.sample
-    ratios = PRESETS[preset_name]
-    amplitude = rand(0.4..0.8).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(1.5..4.0).round(2) }
+    base_freq = ParamOverride.fetch(o, :base_freq) { freq || rand(120.0..1500.0).round(2) }
+    preset_name = ParamOverride.fetch(o, :preset) { PRESETS.keys.sample }
+    ratios = PRESETS[preset_name] || PRESETS.values.first
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.4..0.8).round(2) }
 
-    # Per-mode Q (resonance/ring time) and amplitude.
-    # Higher Q → longer ring. Lower modes typically ring longer.
-    modes = ratios.map.with_index do |ratio, i|
-      q = (rand(800.0..3000.0) / (1 + i * 0.4)).round(1)
-      amp = (1.0 / (1 + i * 0.6)).round(4)
-      jitter = rand(-0.5..0.5).round(3) # tiny inharmonicity per voice
-      mode_freq = (base_freq * ratio + jitter).round(3)
-      { freq: mode_freq, q: q, amplitude: amp }
+    modes = ParamOverride.fetch(o, :modes) do
+      ratios.map.with_index do |ratio, i|
+        q = (rand(800.0..3000.0) / (1 + i * 0.4)).round(1)
+        amp = (1.0 / (1 + i * 0.6)).round(4)
+        jitter = rand(-0.5..0.5).round(3)
+        mode_freq = (base_freq * ratio + jitter).round(3)
+        { freq: mode_freq, q: q, amplitude: amp }
+      end
     end
+    modes = modes.map { |m| { freq: m[:freq] || m["freq"], q: m[:q] || m["q"], amplitude: m[:amplitude] || m["amplitude"] } }
 
-    # Excitation pulse width. Shorter = sharper strike, longer = softer mallet.
-    excite_dur = rand(0.001..0.008).round(4)
+    excite_dur = ParamOverride.fetch(o, :excite_duration) { rand(0.001..0.008).round(4) }
 
     params = {
       base_freq: base_freq,
@@ -61,17 +62,14 @@ module SynthModal
       instr 1
         iamp = #{amplitude}
 
-        ; Brief noise burst as the strike excitation
         aexcite linseg 1, #{excite_dur}, 1, 0.0001, 0, p3 - #{excite_dur} - 0.0001, 0
         anoise rand 1
         ain = anoise * aexcite
 
-        ; Resonant modes
       #{mode_lines.join("\n")}
 
         amix = #{mix_expr}
 
-        ; Gentle fade so the natural ring doesn't get truncated abruptly
         aenv linseg 1, p3 - 0.05, 1, 0.05, 0
         aout = amix * iamp * aenv * 0.3
 

@@ -498,15 +498,17 @@ function cardHTML(batch, sound) {
         <div class="redrive" data-name="${esc(sound.name)}" data-synth-type="${esc(sound.synth_type)}">
           <div class="redrive-row">
             <label class="redrive-knob">
-              <span>Frequency (Hz)</span>
-              <input type="number" class="redrive-freq" min="20" max="8000" step="1" value="${primaryFreq(sound) ?? ""}" placeholder="random">
-            </label>
-            <label class="redrive-knob">
               <span>Duration (s)</span>
               <input type="number" class="redrive-duration" min="0.5" step="0.5" value="${sound.duration_seconds}" placeholder="random">
             </label>
             <button class="redrive-btn" onclick="redriveSound(this)">Re-drive (${esc(sound.synth_type)})</button>
+            <button class="redrive-reset" onclick="resetRedriveParams(this)" title="Reset params to source values">Reset params</button>
+            <button class="redrive-clear" onclick="clearRedriveParams(this)" title="Re-randomize all params (still locked to this synth type)">Clear params</button>
           </div>
+          <label class="redrive-params-label">
+            <span>Params override (JSON) — keys you set are pinned; remove a key to let it re-randomize</span>
+            <textarea class="redrive-params" spellcheck="false" rows="10">${esc(JSON.stringify(sound.params, null, 2))}</textarea>
+          </label>
           <div class="redrive-status"></div>
         </div>
         <h3>Parameters</h3>
@@ -518,25 +520,47 @@ function cardHTML(batch, sound) {
   `;
 }
 
-function primaryFreq(sound) {
-  const p = sound.params || {};
-  const candidates = [
-    p.carrier_freq, p.base_freq, p.fundamental, p.center_freq, p.body_freq,
-  ];
-  for (const v of candidates) if (typeof v === "number") return v;
-  return null;
+function resetRedriveParams(btn) {
+  const wrap = btn.closest(".redrive");
+  const card = btn.closest(".sound-card");
+  const sourceName = wrap.dataset.name;
+  const ta = wrap.querySelector(".redrive-params");
+  // Pull params from the JSON pre block in the same card.
+  const pre = card.querySelector(".sound-detail pre");
+  if (pre) ta.value = pre.textContent;
+  wrap.querySelector(".redrive-status").textContent = "";
+}
+
+function clearRedriveParams(btn) {
+  const wrap = btn.closest(".redrive");
+  wrap.querySelector(".redrive-params").value = "{}";
+  wrap.querySelector(".redrive-status").textContent = "";
 }
 
 async function redriveSound(btn) {
   const wrap = btn.closest(".redrive");
   const status = wrap.querySelector(".redrive-status");
   const synthType = wrap.dataset.synthType;
-  const freqInput = wrap.querySelector(".redrive-freq").value;
   const durationInput = wrap.querySelector(".redrive-duration").value;
+  const paramsRaw = wrap.querySelector(".redrive-params").value.trim();
+
+  let paramsObj = null;
+  if (paramsRaw && paramsRaw !== "{}") {
+    try {
+      paramsObj = JSON.parse(paramsRaw);
+      if (typeof paramsObj !== "object" || Array.isArray(paramsObj)) {
+        throw new Error("params must be a JSON object");
+      }
+    } catch (e) {
+      status.textContent = `Invalid params JSON: ${e.message}`;
+      status.classList.add("error");
+      return;
+    }
+  }
 
   const body = { count: 1, types: synthType };
-  if (freqInput) body.freq = parseFloat(freqInput);
   if (durationInput) body.duration = parseFloat(durationInput);
+  if (paramsObj) body.params = paramsObj;
 
   btn.disabled = true;
   btn.textContent = "Re-driving...";

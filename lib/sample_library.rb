@@ -137,6 +137,17 @@ module SampleLibrary
     @cache_dirty = false
   end
 
+  # Resolve a stored relative sample path (e.g. "drums/kick.wav") back to an
+  # absolute path under samples_dir. Returns nil if the file no longer exists.
+  def resolve(relative_path)
+    return nil unless configured? && relative_path
+    candidate = File.join(@samples_dir, relative_path)
+    return candidate if File.exist?(candidate)
+    # Bare basename match — fall back to any indexed file with that name.
+    base = File.basename(relative_path)
+    all.find { |f| File.basename(f) == base }
+  end
+
   private
 
   def scan(dir)

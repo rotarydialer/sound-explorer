@@ -1,38 +1,40 @@
 require_relative "sample_library"
+require_relative "param_override"
 
-# Spectral morph: smoothly interpolate between the spectral frames of two
-# samples. Uses `pvstanal` (table-driven streaming phase-vocoder analysis)
-# into `pvsmorph` and resynthesises with `pvsynth`.
 module SynthSpectralMorph
   module_function
 
   MAX_SAMPLE_DURATION = 45.0
-
   MORPH_SHAPES = ["linear", "reverse", "sine", "random_walk"].freeze
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(3.0..7.0).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(3.0..7.0).round(2) }
 
-    # Pick two distinct samples.
-    sample_a = SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
-    sample_b = SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
-    8.times do
-      break if sample_b != sample_a
-      sample_b = SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
-    end
+    sample_a = resolve_or_pick(o, :sample_a)
+    sample_b =
+      if (rel = ParamOverride.get(o, :sample_b)) && rel != ParamOverride::MISSING
+        SampleLibrary.resolve(rel) || SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+      else
+        b = SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+        8.times do
+          break if b != sample_a
+          b = SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+        end
+        b
+      end
 
-    pitch_a_semis = rand(-7.0..7.0).round(2)
-    pitch_b_semis = rand(-7.0..7.0).round(2)
+    pitch_a_semis = ParamOverride.fetch(o, :pitch_a_semitones) { rand(-7.0..7.0).round(2) }
+    pitch_b_semis = ParamOverride.fetch(o, :pitch_b_semitones) { rand(-7.0..7.0).round(2) }
     pitch_a = (2.0 ** (pitch_a_semis / 12.0)).round(5)
     pitch_b = (2.0 ** (pitch_b_semis / 12.0)).round(5)
 
-    morph_shape = MORPH_SHAPES.sample
-    morph_rate = rand(0.05..0.5).round(3) # Hz, slow oscillation
+    morph_shape = ParamOverride.fetch(o, :morph_shape) { MORPH_SHAPES.sample }
+    morph_rate = ParamOverride.fetch(o, :morph_rate) { rand(0.05..0.5).round(3) }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.4..0.7).round(2) }
 
-    amplitude = rand(0.4..0.7).round(2)
-
-    attack = rand(0.2..0.8).round(3)
-    release = rand(0.3..1.2).round(3)
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.2..0.8).round(3) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.3..1.2).round(3) }
     if attack + release > duration * 0.9
       scale = (duration * 0.9) / (attack + release)
       attack = (attack * scale).round(3)
@@ -103,6 +105,15 @@ module SynthSpectralMorph
     CSD
 
     { params: params, csd: csd, synth_type: "spectral_morph", duration: duration }
+  end
+
+  def resolve_or_pick(o, key)
+    rel = ParamOverride.get(o, key)
+    if rel != ParamOverride::MISSING
+      SampleLibrary.resolve(rel) || SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+    else
+      SampleLibrary.pick(max_duration: MAX_SAMPLE_DURATION)
+    end
   end
 
   def relative_sample_path(path)

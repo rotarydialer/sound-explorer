@@ -1,25 +1,36 @@
+require_relative "param_override"
+
 module SynthAdditive
   module_function
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(1.0..4.0).round(2)
-    fundamental = freq || rand(80.0..600.0).round(2)
-    num_partials = rand(3..16)
-    amplitude = rand(0.3..0.7).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(1.0..4.0).round(2) }
+    fundamental = ParamOverride.fetch(o, :fundamental) { freq || rand(80.0..600.0).round(2) }
+    num_partials = ParamOverride.fetch(o, :num_partials) { rand(3..16) }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.3..0.7).round(2) }
+    rolloff_exp = ParamOverride.fetch(o, :rolloff_exponent) { rand(0.5..2.5).round(3) }
 
-    # Generate partial amplitudes with a randomized rolloff curve
-    rolloff_exp = rand(0.5..2.5).round(3)
-    partials = (1..num_partials).map do |n|
-      amp = (1.0 / (n ** rolloff_exp)).round(4)
-      detune = rand(-5.0..5.0).round(3) # cents of detuning per partial
-      { harmonic: n, amplitude: amp, detune_cents: detune }
+    partials = ParamOverride.fetch(o, :partials) do
+      (1..num_partials).map do |n|
+        amp = (1.0 / (n ** rolloff_exp)).round(4)
+        detune = rand(-5.0..5.0).round(3)
+        { harmonic: n, amplitude: amp, detune_cents: detune }
+      end
+    end
+    # Normalize JSON-deserialized partial hashes (string keys) to symbol keys.
+    partials = partials.map do |p|
+      {
+        harmonic: p[:harmonic] || p["harmonic"],
+        amplitude: p[:amplitude] || p["amplitude"],
+        detune_cents: p[:detune_cents] || p["detune_cents"]
+      }
     end
 
-    # Envelope
-    attack = rand(0.05..1.0).round(3)
-    decay = rand(0.05..0.5).round(3)
-    sustain = rand(0.3..0.9).round(2)
-    release = rand(0.2..1.5).round(3)
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.05..1.0).round(3) }
+    decay = ParamOverride.fetch(o, :envelope, :decay) { rand(0.05..0.5).round(3) }
+    sustain = ParamOverride.fetch(o, :envelope, :sustain) { rand(0.3..0.9).round(2) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.2..1.5).round(3) }
 
     env_total = attack + decay + release
     if env_total > duration * 0.9
@@ -38,7 +49,6 @@ module SynthAdditive
       envelope: { attack: attack, decay: decay, sustain: sustain, release: release }
     }
 
-    # Build the oscillator lines for each partial
     osc_lines = partials.map.with_index do |p, i|
       detune_ratio = 2.0 ** (p[:detune_cents] / 1200.0)
       freq = "ifund * #{p[:harmonic]} * #{detune_ratio.round(6)}"

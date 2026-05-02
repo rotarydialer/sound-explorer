@@ -1,38 +1,40 @@
+require_relative "param_override"
+
 module SynthKarplus
   module_function
 
-  # Methods for the pluck opcode:
-  # 1 = simple averaging, 2 = stretched averaging, 6 = 1st order all-pass.
-  # 3/4 are drum-like and live in synth_drum / synth_modal instead.
   METHODS = {
     1 => "simple_average",
     2 => "stretched_average",
     6 => "all_pass"
   }.freeze
+  METHOD_CODES = METHODS.invert.freeze
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(1.0..3.5).round(2)
-    base_freq = freq || rand(80.0..1200.0).round(2)
-    method = METHODS.keys.sample
-    amplitude = rand(0.4..0.8).round(2)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(1.0..3.5).round(2) }
+    base_freq = ParamOverride.fetch(o, :base_freq) { freq || rand(80.0..1200.0).round(2) }
+    method_name = ParamOverride.fetch(o, :method) { METHODS[METHODS.keys.sample] }
+    method = METHOD_CODES.fetch(method_name, 1)
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.4..0.8).round(2) }
+    voice_count = ParamOverride.fetch(o, :voices) { rand(1..3) }
 
-    # Layer 1-3 plucks at slight detunings for chorus-like richness.
-    voice_count = rand(1..3)
-    detunes = voice_count.times.map { rand(-12.0..12.0).round(2) } # cents
-    detunes[0] = 0.0 # primary voice in tune
+    detunes = ParamOverride.fetch(o, :detunes_cents) do
+      ds = voice_count.times.map { rand(-12.0..12.0).round(2) }
+      ds[0] = 0.0 if ds.any?
+      ds
+    end
+    voice_count = detunes.size if detunes.size != voice_count
 
-    # Method-specific iparm1:
-    #   1 = simple averaging  → iparm1 unused (default 1.0)
-    #   2 = stretched average → iparm1 is stretch factor, must be ≥ 1
-    #   6 = 1st-order all-pass → iparm1 is all-pass coefficient, range -1..1
-    iparm1 = case method
-             when 2 then rand(1.0..6.0).round(3)
-             when 6 then rand(-0.5..0.5).round(3)
-             else 1
-             end
+    iparm1 = ParamOverride.fetch(o, :iparm1) do
+      case method
+      when 2 then rand(1.0..6.0).round(3)
+      when 6 then rand(-0.5..0.5).round(3)
+      else 1
+      end
+    end
 
-    # Soft tail to prevent abrupt cutoff
-    release = [rand(0.05..0.3).round(3), duration * 0.4].min
+    release = ParamOverride.fetch(o, :release) { [rand(0.05..0.3).round(3), duration * 0.4].min }
 
     params = {
       base_freq: base_freq,
@@ -70,7 +72,6 @@ module SynthKarplus
 
         amix = #{sum_expr}
 
-        ; Soft tail so the buffer's natural decay doesn't click off
         aenv linseg 1, p3 - #{release}, 1, #{release}, 0
         aout = amix * aenv
 

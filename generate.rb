@@ -2,6 +2,7 @@
 require "optparse"
 require "fileutils"
 require "time"
+require "json"
 
 require_relative "lib/csd_runner"
 require_relative "lib/metadata"
@@ -62,7 +63,8 @@ options = {
   formats: ["ogg"],
   freq: nil,      # nil means each synth picks its own random frequency
   samples_dir: nil,
-  samples_info: false
+  samples_info: false,
+  params_override: nil
 }
 
 OptionParser.new do |opts|
@@ -94,6 +96,10 @@ OptionParser.new do |opts|
 
   opts.on("--samples-info", "Print info about the configured sample library and exit") do
     options[:samples_info] = true
+  end
+
+  opts.on("--params-json JSON", "JSON object of param overrides; applied to every generated sound") do |j|
+    options[:params_override] = JSON.parse(j)
   end
 end.parse!
 
@@ -160,7 +166,7 @@ options[:count].times do |i|
 
   print "  [#{i + 1}/#{options[:count]}] #{name}..."
 
-  result = synth.generate(duration: options[:duration], freq: options[:freq])
+  result = synth.generate(duration: options[:duration], freq: options[:freq], params: options[:params_override])
 
   paths = CsdRunner.render(result[:csd], output_dir, name, formats: options[:formats])
 

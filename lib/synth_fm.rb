@@ -1,16 +1,19 @@
+require_relative "param_override"
+
 module SynthFm
   module_function
 
-  def generate(duration: nil, freq: nil)
-    duration ||= rand(1.0..4.0).round(2)
-    carrier_freq = freq || rand(100.0..2000.0).round(2)
-    mod_ratio = rand(0.5..8.0).round(3)
-    mod_index = rand(0.1..20.0).round(2)
-    amplitude = rand(0.3..0.8).round(2)
-    attack = rand(0.01..0.5).round(3)
-    decay = rand(0.05..0.5).round(3)
-    sustain = rand(0.2..0.8).round(2)
-    release = rand(0.1..1.0).round(3)
+  def generate(duration: nil, freq: nil, params: nil)
+    o = params
+    duration = ParamOverride.fetch(o, :duration) { duration || rand(1.0..4.0).round(2) }
+    carrier_freq = ParamOverride.fetch(o, :carrier_freq) { freq || rand(100.0..2000.0).round(2) }
+    mod_ratio = ParamOverride.fetch(o, :mod_ratio) { rand(0.5..8.0).round(3) }
+    mod_index = ParamOverride.fetch(o, :mod_index) { rand(0.1..20.0).round(2) }
+    amplitude = ParamOverride.fetch(o, :amplitude) { rand(0.3..0.8).round(2) }
+    attack = ParamOverride.fetch(o, :envelope, :attack) { rand(0.01..0.5).round(3) }
+    decay = ParamOverride.fetch(o, :envelope, :decay) { rand(0.05..0.5).round(3) }
+    sustain = ParamOverride.fetch(o, :envelope, :sustain) { rand(0.2..0.8).round(2) }
+    release = ParamOverride.fetch(o, :envelope, :release) { rand(0.1..1.0).round(3) }
 
     # Clamp envelope so it fits within duration
     env_total = attack + decay + release
