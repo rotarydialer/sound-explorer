@@ -475,7 +475,7 @@ function cardHTML(batch, sound) {
     : "";
 
   return `
-    <div class="sound-card" id="card-${esc(sound.name)}">
+    <div class="sound-card">
       <div class="sound-card-header">
         <span class="sound-name">${esc(sound.name)}</span>
         <div class="sound-card-header-right">
@@ -489,7 +489,7 @@ function cardHTML(batch, sound) {
       <div class="sound-controls">
         <button class="play-btn" data-url="${audioUrl}" onclick="togglePlay(this)">Play</button>
         <span class="duration">${sound.duration_seconds}s</span>
-        <button class="detail-toggle" onclick="toggleDetail('${esc(sound.name)}')">details</button>
+        <button class="detail-toggle" onclick="toggleDetail(this)">details</button>
       </div>
       ${tagsHTML}
       ${descHTML}
@@ -747,9 +747,8 @@ function stopPlayback() {
   }
 }
 
-function toggleDetail(name) {
-  const card = document.getElementById(`card-${name}`);
-  card.classList.toggle("expanded");
+function toggleDetail(btn) {
+  btn.closest(".sound-card").classList.toggle("expanded");
 }
 
 function esc(str) {
