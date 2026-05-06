@@ -149,7 +149,7 @@ if sample_types_requested.any?
 end
 
 # Create batch directory
-batch = Time.now.strftime("%Y-%m-%d_%H%M%S")
+batch = Time.now.strftime("%Y-%m-%d_%H")
 output_dir = File.join(__dir__, "output", batch)
 FileUtils.mkdir_p(output_dir)
 
